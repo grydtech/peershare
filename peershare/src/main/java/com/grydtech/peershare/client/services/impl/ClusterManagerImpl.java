@@ -30,6 +30,7 @@ public class ClusterManagerImpl implements ClusterManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterManagerImpl.class);
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService joinExecutor = Executors.newSingleThreadScheduledExecutor();
     private final List<Node> bootstrapNodes = new ArrayList<>();
     private final List<Node> knownNodes = new ArrayList<>();
 
@@ -39,8 +40,11 @@ public class ClusterManagerImpl implements ClusterManager {
     @Value("${node.heart-beat-interval}")
     private int nodeHeartBeatInterval;
 
+    @Value("${join.retry-interval}")
+    private int joinRetryInterval;
+
     private final MessageSender messageSender;
-    private ClientState clientState = ClientState.UNREGISTERED;
+    private ClientState clientState = ClientState.DISCONNECTED;
 
     @Autowired
     public ClusterManagerImpl(MessageSender messageSender) {
@@ -48,7 +52,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public void register() throws IOException, BootstrapException {
+    public synchronized void register() throws IOException, BootstrapException {
         RegisterResponse registerResponse = this.messageSender.sendRegisterRequest();
 
         switch (registerResponse.getStatus()) {
@@ -60,140 +64,121 @@ public class ClusterManagerImpl implements ClusterManager {
                 throw new BootstrapException("bootstrap server full");
         }
 
-        synchronized (this) {
-            this.clientState = ClientState.REGISTERED;
-            LOGGER.info("client registered with bootstrap server");
+        LOGGER.info("client registered with bootstrap server");
+        this.clientState = ClientState.IDLE;
 
-            this.bootstrapNodes.clear();
-            this.bootstrapNodes.addAll(registerResponse.getNodes());
-        }
+        this.bootstrapNodes.clear();
+        this.bootstrapNodes.addAll(registerResponse.getNodes());
     }
 
     @Override
-    public void unregister() throws IOException, BootstrapException, IllegalCommandException {
-        if (!this.knownNodes.isEmpty()) {
+    public synchronized void unregister() throws IOException, IllegalCommandException {
+        if (this.clientState == ClientState.CONNECTED) {
             throw new IllegalCommandException("client still connected to cluster, please leave first");
         }
 
-        UnregisterResponse unregisterResponse = this.messageSender.sendUnregisterRequest();
+        this.messageSender.sendUnregisterRequest();
 
-        switch (unregisterResponse.getStatus()) {
-            case COMMAND_ERROR:
-                throw new BootstrapException("invalid command, please check again");
+        this.clientState = ClientState.UNREGISTERED;
+        LOGGER.info("client unregistered with bootstrap server");
+
+        this.bootstrapNodes.clear();
+    }
+
+    @Override
+    public synchronized void join() throws IllegalCommandException, IOException {
+        if (this.clientState == ClientState.UNREGISTERED) {
+            throw new IllegalCommandException("client unregistered, please register again");
         }
 
-        synchronized (this) {
-            this.clientState = ClientState.UNREGISTERED;
-            LOGGER.info("client unregistered with bootstrap server");
-
-            this.bootstrapNodes.clear();
+        for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
+            this.messageSender.sendJoinRequest(n);
         }
     }
 
     @Override
-    public void join() throws IllegalCommandException, IOException {
-        synchronized (this) {
-            if (this.clientState == ClientState.UNREGISTERED) {
-                throw new IllegalCommandException("client unregistered, please register again");
-            }
+    public synchronized void leave() throws IOException {
+        for (Node n : this.knownNodes) {
+            this.messageSender.sendLeaveRequest(n);
+        }
+        this.knownNodes.clear();
 
-            for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
-                this.messageSender.sendJoinRequest(n);
+        LOGGER.info("client disconnected from cluster");
+
+        this.clientState = ClientState.DISCONNECTED;
+    }
+
+    @Override
+    public synchronized void nodeDiscovered(Node discoveredNode, int hop) throws IOException {
+        Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(discoveredNode.getId())).findFirst();
+
+        if (!node.isPresent()) {
+            LOGGER.info("send join request to: \"{}\"", discoveredNode.getId());
+
+            messageSender.sendJoinRequest(discoveredNode);
+
+            LOGGER.info("select random nodes to send node discovered gossip");
+
+            for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
+                messageSender.sendNodeDiscoveredGossip(discoveredNode, n, hop);
             }
         }
     }
 
     @Override
-    public void leave() throws IOException {
-        synchronized (this) {
-            for (Node n: this.knownNodes) {
-                this.messageSender.sendLeaveRequest(n);
+    public synchronized void nodeUnresponsive(Node unresponsiveNode, int hop) throws IOException {
+        Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(unresponsiveNode.getId())).findFirst();
+
+        if (node.isPresent()) {
+            this.knownNodes.removeIf(n -> n.getId().equals(unresponsiveNode.getId()));
+
+            LOGGER.info("client node: \"{}\" removed", unresponsiveNode.getId());
+
+            LOGGER.info("select random nodes to send node unresponsive gossip");
+
+            for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
+                messageSender.sendNodeUnresponsiveGossip(unresponsiveNode, n, hop);
             }
-            this.knownNodes.clear();
         }
     }
 
     @Override
-    public void nodeDiscovered(Node discoveredNode, int hop) throws IOException {
-        synchronized (this) {
-            Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(discoveredNode.getId())).findFirst();
+    public synchronized void nodeConnected(Node connectedNode) throws IOException {
+        Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(connectedNode.getId())).findFirst();
 
-            if (!node.isPresent()) {
-                LOGGER.info("send join request to: \"{}\"", discoveredNode.getId());
+        if (!node.isPresent()) {
+            connectedNode.startTTL(nodeTTL);
+            knownNodes.add(connectedNode);
 
-                messageSender.sendJoinRequest(discoveredNode);
+            LOGGER.info("client node: \"{}\" added", connectedNode.getId());
 
-                LOGGER.info("select random nodes to send node discovered gossip");
-
-                for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
-                    messageSender.sendNodeDiscoveredGossip(discoveredNode, n, hop);
+            for (Node n : this.knownNodes) {
+                if (!n.getId().equals(connectedNode.getId())) {
+                    messageSender.sendNodeDiscoveredGossip(connectedNode, n, 1);
                 }
             }
+        } else {
+            LOGGER.warn("node already connected");
         }
     }
 
     @Override
-    public void nodeUnresponsive(Node unresponsiveNode, int hop) throws IOException {
-        synchronized (this) {
-            Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(unresponsiveNode.getId())).findFirst();
-
-            if (node.isPresent()) {
-                this.knownNodes.removeIf(n -> n.getId().equals(unresponsiveNode.getId()));
-
-                LOGGER.info("client node: \"{}\" removed", unresponsiveNode.getId());
-
-                LOGGER.info("select random nodes to send node unresponsive gossip");
-
-                for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
-                    messageSender.sendNodeUnresponsiveGossip(unresponsiveNode, n, hop);
-                }
-            }
-        }
+    public synchronized void nodeDisconnected(Node disconnectedNode) {
+        knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
     }
 
     @Override
-    public void nodeConnected(Node connectedNode) throws IOException {
-        synchronized (this) {
-            Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(connectedNode.getId())).findFirst();
+    public synchronized void nodeAlive(Node aliveNode) throws IOException {
+        Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(aliveNode.getId())).findFirst();
 
-            if (!node.isPresent()) {
-                connectedNode.startTTL(nodeTTL);
-                knownNodes.add(connectedNode);
+        if (node.isPresent()) {
+            LOGGER.trace("client node: \"{}\" ttl reset", aliveNode.getId());
 
-                LOGGER.info("client node: \"{}\" added", connectedNode.getId());
+            node.get().resetTTL();
+        } else {
+            LOGGER.warn("node disconnected, retrying connection");
 
-                for (Node n : this.knownNodes) {
-                    if (!n.getId().equals(connectedNode.getId())) {
-                        messageSender.sendNodeDiscoveredGossip(connectedNode, n, 1);
-                    }
-                }
-            } else {
-                LOGGER.warn("node already connected");
-            }
-        }
-    }
-
-    @Override
-    public void nodeDisconnected(Node disconnectedNode) {
-        synchronized (this) {
-            knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
-        }
-    }
-
-    @Override
-    public void nodeAlive(Node aliveNode) throws IOException {
-        synchronized (this) {
-            Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(aliveNode.getId())).findFirst();
-
-            if (node.isPresent()) {
-                LOGGER.trace("client node: \"{}\" ttl reset", aliveNode.getId());
-
-                node.get().resetTTL();
-            } else {
-                LOGGER.warn("node disconnected, retrying connection");
-
-                this.messageSender.sendJoinRequest(aliveNode);
-            }
+            this.messageSender.sendJoinRequest(aliveNode);
         }
     }
 
@@ -205,6 +190,28 @@ public class ClusterManagerImpl implements ClusterManager {
     @Override
     public void startService() {
         LOGGER.info("client manager started");
+
+        this.joinExecutor.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                if (clientState == ClientState.IDLE && !bootstrapNodes.isEmpty() && knownNodes.isEmpty()) {
+                    LOGGER.warn("client is idle, retry join");
+
+                    for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
+                        try {
+                            this.messageSender.sendJoinRequest(n);
+                        } catch (IOException e) {
+                            LOGGER.error(e.getMessage(), e);
+                        }
+                    }
+                } else {
+                    LOGGER.info("join completed, shutting down join retry manager");
+
+                    this.joinExecutor.shutdown();
+                }
+            }
+        }, joinRetryInterval, joinRetryInterval, TimeUnit.SECONDS);
+
+        LOGGER.info("join retry manager started");
 
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             synchronized (this) {

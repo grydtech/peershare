@@ -53,6 +53,8 @@ public class FileSearchManagerImpl implements FileSearchManager {
         LOGGER.info("file search request submitted: \"{}\"", keyword);
 
         synchronized (this) {
+            LOGGER.trace("add search; \"{}\" to queue for cleanup", searchId);
+
             searchQueue.add(searchId.toString());
 
             FileSearchResult fileSearchResult = new FileSearchResult(myNode, myFiles, 0);
@@ -74,12 +76,17 @@ public class FileSearchManagerImpl implements FileSearchManager {
     public void submitSearchResult(UUID searchId, List<String> discoveredFiles, Node node, int hops) {
         synchronized (this) {
             BehaviorSubject<FileSearchResult> behaviorSubject = resultsMap.get(searchId.toString());
-            List<FileInfo> files = discoveredFiles.stream().map(FileInfo::new).collect(Collectors.toList());
-            FileSearchResult fileSearchResult = new FileSearchResult(node, files, hops);
 
-            LOGGER.info("push received search results");
+            if (behaviorSubject != null) {
+                List<FileInfo> files = discoveredFiles.stream().map(FileInfo::new).collect(Collectors.toList());
+                FileSearchResult fileSearchResult = new FileSearchResult(node, files, hops);
 
-            behaviorSubject.onNext(fileSearchResult);
+                LOGGER.info("push received search results");
+
+                behaviorSubject.onNext(fileSearchResult);
+            } else {
+                LOGGER.warn("search already completed");
+            }
         }
     }
 
@@ -106,6 +113,8 @@ public class FileSearchManagerImpl implements FileSearchManager {
                 BehaviorSubject<FileSearchResult> behaviorSubject = resultsMap.get(key);
                 resultsMap.remove(key);
                 behaviorSubject.onComplete();
+
+                LOGGER.trace("search: \"{}\" send completed response and remove", key);
             }
         }, searchTimeout, searchTimeout, TimeUnit.SECONDS);
 
