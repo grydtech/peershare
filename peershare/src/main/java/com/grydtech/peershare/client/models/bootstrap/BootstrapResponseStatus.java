@@ -2,10 +2,9 @@ package com.grydtech.peershare.client.models.bootstrap;
 
 public enum BootstrapResponseStatus {
     SUCCESSFUL,
-    COMMAND_ERROR,
-    ALREADY_REGISTERED_TO_YOU,
-    ALREADY_REGISTERED_TO_OTHER,
-    BOOTSTRAP_FULL,
+    ERROR,
+    ALREADY_REGISTERED,
+    BOOTSTRAP_SERVER_FULL,
     UNKNOWN;
 
     public static BootstrapResponseStatus byCode(int code) {
@@ -17,13 +16,11 @@ public enum BootstrapResponseStatus {
             case 2:
                 return SUCCESSFUL;
             case 9999:
-                return COMMAND_ERROR;
+                return ERROR;
             case 9998:
-                return ALREADY_REGISTERED_TO_YOU;
+                return ALREADY_REGISTERED;
             case 9997:
-                return ALREADY_REGISTERED_TO_OTHER;
-            case 9996:
-                return BOOTSTRAP_FULL;
+                return BOOTSTRAP_SERVER_FULL;
             default:
                 return UNKNOWN;
         }

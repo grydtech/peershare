@@ -58,11 +58,11 @@ public class ClusterManagerImpl implements ClusterManager {
         RegisterResponse registerResponse = this.messageSender.sendRegisterRequest();
 
         switch (registerResponse.getStatus()) {
-            case COMMAND_ERROR:
+            case ERROR:
                 throw new BootstrapException("invalid command, please check again");
-            case ALREADY_REGISTERED_TO_OTHER:
-                throw new BootstrapException("already registered to another user");
-            case BOOTSTRAP_FULL:
+            case ALREADY_REGISTERED:
+                throw new BootstrapException("already registered");
+            case BOOTSTRAP_SERVER_FULL:
                 throw new BootstrapException("bootstrap server full");
         }
 

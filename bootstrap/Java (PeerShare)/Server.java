@@ -21,7 +21,7 @@ public class Server extends Thread {
         try{
             ServerSocket serverSocket = new ServerSocket(port);
 
-            System.out.println("Bootstrap server started with port: " + port);
+            System.out.println("INFO: Bootstrap server started with port: " + port);
 
             while (true) {
                 try (Socket socket = serverSocket.accept()) {
@@ -30,7 +30,7 @@ public class Server extends Thread {
 
                     String request = in.readLine();
 
-                    System.out.println("REQUEST: " request.substring(5));
+                    System.out.println("REQUEST: " + request.substring(5));
 
                     String command = request.split(" ")[1];
 
@@ -46,11 +46,11 @@ public class Server extends Thread {
 
                     out.println(response);
 
-                    System.out.println("RESPONSE: " response.substring(5))
+                    System.out.println("RESPONSE: " + response.substring(5));
                 }
             }
         } catch (IOException e) {
-            LOGGER.error(e.getMessage(), e);
+            System.out.println("ERROR: " + e.getMessage());
         }
     }
 

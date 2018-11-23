@@ -15,9 +15,6 @@
 #include <string.h>
 #include "P2PRegistry.h"
 #include <netdb.h>
-#include <fcntl.h>
-#include <unistd.h>
-
 
 struct table_entry peer_table[TABLE_SIZE];
 int no_peers = 0;
@@ -331,12 +328,12 @@ int sendreply(int sockfd, unsigned char reg, int status)
 
     if((reg == 1) && (status == -1)) //REG & already registered
     {
-        strcpy(message, "0015 REGOK 9999");
+        strcpy(message, "0015 REGOK 9998");
         msglen = 15;
     }
     else if((reg == 1) && (status == -2)) //REG & error
     {
-        strcpy(message, "0015 REGOK 9998");
+        strcpy(message, "0015 REGOK 9999");
         msglen = 15;
     }
     else if((reg == 1) && (status == -3)) //REG & peer table full
