@@ -4,6 +4,7 @@ import com.grydtech.peershare.client.exceptions.BootstrapException;
 import com.grydtech.peershare.client.exceptions.IllegalCommandException;
 import com.grydtech.peershare.client.models.Node;
 import com.grydtech.peershare.shared.services.Manager;
+import io.reactivex.Observable;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,5 +29,5 @@ public interface ClusterManager extends Manager {
 
     void nodeAlive(Node aliveNode) throws IOException;
 
-    List<Node> getConnectedCluster();
+    Observable<List<Node>> getConnectedCluster();
 }

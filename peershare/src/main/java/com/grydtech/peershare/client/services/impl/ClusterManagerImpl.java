@@ -2,13 +2,14 @@ package com.grydtech.peershare.client.services.impl;
 
 import com.grydtech.peershare.client.exceptions.BootstrapException;
 import com.grydtech.peershare.client.exceptions.IllegalCommandException;
+import com.grydtech.peershare.client.helpers.NodeHelper;
 import com.grydtech.peershare.client.models.ClientState;
 import com.grydtech.peershare.client.models.Node;
 import com.grydtech.peershare.client.models.bootstrap.RegisterResponse;
-import com.grydtech.peershare.client.models.bootstrap.UnregisterResponse;
 import com.grydtech.peershare.client.services.ClusterManager;
 import com.grydtech.peershare.client.services.MessageSender;
-import com.grydtech.peershare.client.helpers.NodeHelper;
+import io.reactivex.Observable;
+import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ public class ClusterManagerImpl implements ClusterManager {
     private final ScheduledExecutorService joinExecutor = Executors.newSingleThreadScheduledExecutor();
     private final List<Node> bootstrapNodes = new ArrayList<>();
     private final List<Node> knownNodes = new ArrayList<>();
+    private final BehaviorSubject<List<Node>> knownNodesBehaviourSubject = BehaviorSubject.create();
 
     @Value("${node.ttl}")
     private int nodeTTL;
@@ -64,7 +66,7 @@ public class ClusterManagerImpl implements ClusterManager {
                 throw new BootstrapException("bootstrap server full");
         }
 
-        LOGGER.info("client registered with bootstrap server");
+        LOGGER.info("node registered with bootstrap server");
         this.clientState = ClientState.IDLE;
 
         this.bootstrapNodes.clear();
@@ -74,13 +76,13 @@ public class ClusterManagerImpl implements ClusterManager {
     @Override
     public synchronized void unregister() throws IOException, IllegalCommandException {
         if (this.clientState == ClientState.CONNECTED) {
-            throw new IllegalCommandException("client still connected to cluster, please leave first");
+            throw new IllegalCommandException("node still connected to cluster, please leave first");
         }
 
         this.messageSender.sendUnregisterRequest();
 
         this.clientState = ClientState.UNREGISTERED;
-        LOGGER.info("client unregistered with bootstrap server");
+        LOGGER.info("node unregistered with bootstrap server");
 
         this.bootstrapNodes.clear();
     }
@@ -88,7 +90,7 @@ public class ClusterManagerImpl implements ClusterManager {
     @Override
     public synchronized void join() throws IllegalCommandException, IOException {
         if (this.clientState == ClientState.UNREGISTERED) {
-            throw new IllegalCommandException("client unregistered, please register again");
+            throw new IllegalCommandException("node already unregistered, please register again");
         }
 
         for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
@@ -102,8 +104,9 @@ public class ClusterManagerImpl implements ClusterManager {
             this.messageSender.sendLeaveRequest(n);
         }
         this.knownNodes.clear();
+        this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-        LOGGER.info("client disconnected from cluster");
+        LOGGER.info("node disconnected from cluster");
 
         this.clientState = ClientState.DISCONNECTED;
     }
@@ -131,8 +134,9 @@ public class ClusterManagerImpl implements ClusterManager {
 
         if (node.isPresent()) {
             this.knownNodes.removeIf(n -> n.getId().equals(unresponsiveNode.getId()));
+            this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-            LOGGER.info("client node: \"{}\" removed", unresponsiveNode.getId());
+            LOGGER.info("unresponsive node: \"{}\" removed from cluster", unresponsiveNode.getId());
 
             LOGGER.info("select random nodes to send node unresponsive gossip");
 
@@ -148,9 +152,10 @@ public class ClusterManagerImpl implements ClusterManager {
 
         if (!node.isPresent()) {
             connectedNode.startTTL(nodeTTL);
-            knownNodes.add(connectedNode);
+            this.knownNodes.add(connectedNode);
+            this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-            LOGGER.info("client node: \"{}\" added", connectedNode.getId());
+            LOGGER.info("connected node: \"{}\" added to cluster", connectedNode.getId());
 
             for (Node n : this.knownNodes) {
                 if (!n.getId().equals(connectedNode.getId())) {
@@ -158,13 +163,16 @@ public class ClusterManagerImpl implements ClusterManager {
                 }
             }
         } else {
-            LOGGER.warn("node already connected");
+            LOGGER.warn("node: \"{}\" already connected", connectedNode.getId());
         }
     }
 
     @Override
     public synchronized void nodeDisconnected(Node disconnectedNode) {
-        knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
+        this.knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
+        this.knownNodesBehaviourSubject.onNext(this.knownNodes);
+
+        LOGGER.warn("disconnected node: \"{}\" removed from cluster", disconnectedNode.getId());
     }
 
     @Override
@@ -172,7 +180,7 @@ public class ClusterManagerImpl implements ClusterManager {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(aliveNode.getId())).findFirst();
 
         if (node.isPresent()) {
-            LOGGER.trace("client node: \"{}\" ttl reset", aliveNode.getId());
+            LOGGER.trace("node: \"{}\" ttl reset", aliveNode.getId());
 
             node.get().resetTTL();
         } else {
@@ -183,8 +191,8 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public List<Node> getConnectedCluster() {
-        return this.knownNodes;
+    public Observable<List<Node>> getConnectedCluster() {
+        return this.knownNodesBehaviourSubject;
     }
 
     @Override
@@ -194,7 +202,7 @@ public class ClusterManagerImpl implements ClusterManager {
         this.joinExecutor.scheduleAtFixedRate(() -> {
             synchronized (this) {
                 if (clientState == ClientState.IDLE && !bootstrapNodes.isEmpty() && knownNodes.isEmpty()) {
-                    LOGGER.warn("client is idle, retry join");
+                    LOGGER.warn("node is idle, retry join");
 
                     for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
                         try {
@@ -204,7 +212,7 @@ public class ClusterManagerImpl implements ClusterManager {
                         }
                     }
                 } else {
-                    LOGGER.info("join completed, shutting down join retry manager");
+                    LOGGER.info("join with cluster completed, shutting down join retry manager");
 
                     this.joinExecutor.shutdown();
                 }
@@ -241,6 +249,10 @@ public class ClusterManagerImpl implements ClusterManager {
             synchronized (this) {
                 List<Node> unresponsiveNodes = this.knownNodes.stream().filter(Node::isTTLExpired).collect(Collectors.toList());
                 this.knownNodes.removeAll(unresponsiveNodes);
+
+                if (!unresponsiveNodes.isEmpty()) {
+                    this.knownNodesBehaviourSubject.onNext(this.knownNodes);
+                }
 
                 unresponsiveNodes.forEach(un -> {
                     try {

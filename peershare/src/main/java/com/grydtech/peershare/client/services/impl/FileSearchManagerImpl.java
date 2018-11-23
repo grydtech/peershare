@@ -65,7 +65,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         LOGGER.info("send file search request to known nodes");
 
-        for (Node n : clusterManager.getConnectedCluster()) {
+        for (Node n : clusterManager.getConnectedCluster().blockingLast()) {
             messageSender.sendFileSearchRequest(keyword, myNode, n, searchId, 1);
         }
 
@@ -98,7 +98,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         LOGGER.info("send file search request to random nodes");
 
-        for (Node n : clusterManager.getConnectedCluster()) {
+        for (Node n : clusterManager.getConnectedCluster().blockingLast()) {
             messageSender.sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
         }
     }

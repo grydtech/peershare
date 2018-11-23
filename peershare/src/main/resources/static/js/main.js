@@ -1,16 +1,24 @@
 let searchId;
 const searchResults = [];
+const routingTable = [];
 
 const socket = new SockJS('/ws');
 const stompClient = Stomp.over(socket);
 
 stompClient.connect({}, function (frame1) {
     console.log('Connected: ' + frame1);
+
     stompClient.subscribe('/topic/results', function (frame2) {
         const searchResponse = JSON.parse(frame2.body);
 
         addSearchResult(searchResponse.searchId, searchResponse.searchResult);
     });
+
+    stompClient.subscribe('/topic/routing-table', function (frame2) {
+        const response = JSON.parse(frame2.body);
+
+        updateRoutingTable(response.table);
+    })
 });
 
 function uuid() {
@@ -44,9 +52,18 @@ function addSearchResult(id, searchResult) {
     searchResults.push(searchResult);
 }
 
+function updateRoutingTable(result) {
+    routingTable.splice(0, routingTable.length);
+
+    if (result.length) {
+        result.forEach(e => routingTable.push(e));
+    }
+}
+
 const app = new Vue({
     el: '#app',
     data: {
+        routingTable: routingTable,
         searchResults: searchResults,
         searchText: ''
     },

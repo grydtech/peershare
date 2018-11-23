@@ -1,7 +1,9 @@
 package com.grydtech.peershare.web.controllers;
 
 import com.grydtech.peershare.client.models.search.FileSearchResult;
+import com.grydtech.peershare.client.services.ClusterManager;
 import com.grydtech.peershare.client.services.FileSearchManager;
+import com.grydtech.peershare.web.models.RoutingTableResponse;
 import com.grydtech.peershare.web.models.SearchRequest;
 import com.grydtech.peershare.web.models.SearchResponse;
 import com.grydtech.peershare.web.models.SearchResult;
@@ -26,11 +28,15 @@ public class WebSocketController {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final FileSearchManager fileSearchManager;
+    private final ClusterManager clusterManager;
 
     @Autowired
-    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager) {
+    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager) {
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.fileSearchManager = fileSearchManager;
+        this.clusterManager = clusterManager;
+
+        this.sendRoutingTable();
     }
 
     @MessageMapping("/search")
@@ -44,5 +50,11 @@ public class WebSocketController {
             SearchResponse searchResponse = new SearchResponse(searchRequest.getSearchId(), searchResult);
             simpMessagingTemplate.convertAndSend(searchResults, searchResponse);
         }));
+    }
+
+    private void sendRoutingTable() {
+        clusterManager.getConnectedCluster().subscribe(nodes -> {
+            simpMessagingTemplate.convertAndSend("/topic/routing-table", new RoutingTableResponse(nodes));
+        });
     }
 }

@@ -33,13 +33,32 @@
         </form>
     </nav>
 
-    <div v-if="!searchResults.length" class="no-results-area">
-        <img class="no-results-image" src="imgs/no-results.gif">
-    </div>
-
     <div class="container results-area">
-        <div v-if="searchResults.length" class="row">
-            <div class="col">
+        <div class="row">
+            <div class="col-5 pr-5">
+                <h2 class="pb-5">Routing Table</h2>
+
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Host</th>
+                            <th scope="col">Port (TCP)</th>
+                            <th scope="col">Port (UDP)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="entry in routingTable">
+                            <td>{{entry.host}}</td>
+                            <td>{{entry.port}}</td>
+                            <td>{{entry.udpPort}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="col-7 pl-5">
+                <h2 class="pb-5">Search Results</h2>
+
                 <div v-for="searchResult in searchResults" class="card mb-3" style="width: 100%;">
                     <div class="card-body">
                         <h5 class="card-title">Name: {{searchResult.fileName}}</h5>
