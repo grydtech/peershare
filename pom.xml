@@ -11,6 +11,5 @@
     <modules>
         <module>peershare</module>
         <module>filevalidator</module>
-        <module>bootstrap</module>
     </modules>
 </project>

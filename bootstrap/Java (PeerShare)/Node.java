@@ -1,6 +1,5 @@
-package com.grydtech.peershare.bootstrap;
+public class Node {
 
-class Node {
 	private String ip;
 	private int port;
 	private String username;	

@@ -1,5 +1,3 @@
-package com.grydtech.peershare.bootstrap;
-
 public class BootstrapServer {
 
     public static void main(String[] args) {

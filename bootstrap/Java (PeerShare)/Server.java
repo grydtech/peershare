@@ -1,16 +1,9 @@
-package com.grydtech.peershare.bootstrap;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 
 public class Server extends Thread {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(Server.class);
 
     private static final int nodeLimit = 30;
     private static final Random random = new Random();
@@ -28,7 +21,7 @@ public class Server extends Thread {
         try{
             ServerSocket serverSocket = new ServerSocket(port);
 
-            LOGGER.info("Bootstrap server started with port: {}", port);
+            System.out.println("Bootstrap server started with port: " + port);
 
             while (true) {
                 try (Socket socket = serverSocket.accept()) {
@@ -37,7 +30,7 @@ public class Server extends Thread {
 
                     String request = in.readLine();
 
-                    LOGGER.info("REQUEST received: \"{}\"", request);
+                    System.out.println("REQUEST: " request.substring(5));
 
                     String command = request.split(" ")[1];
 
@@ -53,7 +46,7 @@ public class Server extends Thread {
 
                     out.println(response);
 
-                    LOGGER.info("RESPONSE sent: \"{}\"", response);
+                    System.out.println("RESPONSE: " response.substring(5))
                 }
             }
         } catch (IOException e) {
@@ -69,7 +62,7 @@ public class Server extends Thread {
         Node newNode = new Node(ip, port, username);
 
         if (knownNodes.size() >= nodeLimit) {
-            LOGGER.error("failed, can’t register. BS full");
+            System.out.println("ERROR: failed, can’t register. BS full");
             return "0015 REGOK 9996";
         }
 
@@ -77,10 +70,10 @@ public class Server extends Thread {
 
         if (optionalNode.isPresent()) {
             if (optionalNode.get().getUsername().equals(newNode.getUsername())) {
-                LOGGER.error("failed, already registered to you, unregister first");
+                System.out.println("ERROR: failed, already registered to you, unregister first");
                 return "0015 REGOK 9998";
             } else {
-                LOGGER.error("failed, registered to another user, try a different IP and port");
+                System.out.println("ERROR: failed, registered to another user, try a different IP and port");
                 return "0015 REGOK 9997";
             }
         }
@@ -90,12 +83,12 @@ public class Server extends Thread {
         int bound = knownNodes.size();
 
         if (bound == 0) {
-            LOGGER.info("request is successful, no nodes in the system");
+            System.out.println("INFO: request is successful, no nodes in the system");
             response = "0012 REGOK 0";
         } else if (bound == 1) {
             String s = String.format("REGOK 1 %s %d", knownNodes.get(0).getIp(), knownNodes.get(0).getPort());
 
-            LOGGER.info("request is successful, 1 node will be returned");
+            System.out.println("INFO: request is successful, 1 node will be returned");
             response = String.format("%04d %s", s.length() + 5, s);
         } else {
             int index1 = random.nextInt(bound);
@@ -105,11 +98,13 @@ public class Server extends Thread {
                 index2 = random.nextInt(bound);
             }
 
-            String s = String.format("REGOK 2 %s %d %s %d",
+            String s = String.format("REGOK 2 %s %d %s %s %d %s",
                     knownNodes.get(index1).getIp(),
                     knownNodes.get(index1).getPort(),
+                    knownNodes.get(index1).getUsername(),
                     knownNodes.get(index2).getIp(),
-                    knownNodes.get(index2).getPort()
+                    knownNodes.get(index2).getPort(),
+                    knownNodes.get(index2).getUsername()
             );
 
             response = String.format("%04d %s", s.length() + 5, s);
@@ -117,7 +112,7 @@ public class Server extends Thread {
 
         knownNodes.add(newNode);
 
-        LOGGER.info("request is successful, 2 nodes will be returned");
+        System.out.println("INFO: request is successful, 2 nodes will be returned");
         return response;
     }
 
