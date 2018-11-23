@@ -62,7 +62,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
         synchronized (this) {
             this.clientState = ClientState.REGISTERED;
-            LOGGER.info("node registered with bootstrap server");
+            LOGGER.info("client registered with bootstrap server");
 
             this.bootstrapNodes.clear();
             this.bootstrapNodes.addAll(registerResponse.getNodes());
@@ -72,7 +72,7 @@ public class ClusterManagerImpl implements ClusterManager {
     @Override
     public void unregister() throws IOException, BootstrapException, IllegalCommandException {
         if (!this.knownNodes.isEmpty()) {
-            throw new IllegalCommandException("node still connected with other cluster nodes");
+            throw new IllegalCommandException("client still connected to cluster, please leave first");
         }
 
         UnregisterResponse unregisterResponse = this.messageSender.sendUnregisterRequest();
@@ -84,7 +84,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
         synchronized (this) {
             this.clientState = ClientState.UNREGISTERED;
-            LOGGER.info("node unregistered with bootstrap server");
+            LOGGER.info("client unregistered with bootstrap server");
 
             this.bootstrapNodes.clear();
         }
@@ -94,7 +94,7 @@ public class ClusterManagerImpl implements ClusterManager {
     public void join() throws IllegalCommandException, IOException {
         synchronized (this) {
             if (this.clientState == ClientState.UNREGISTERED) {
-                throw new IllegalCommandException("client unregistered");
+                throw new IllegalCommandException("client unregistered, please register again");
             }
 
             for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
@@ -120,7 +120,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
                 messageSender.sendJoinRequest(discoveredNode);
 
-                LOGGER.info("send node discovered gossip to random nodes");
+                LOGGER.info("select random nodes to send node discovered gossip");
 
                 for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
                     messageSender.sendNodeDiscoveredGossip(discoveredNode, n, hop);
@@ -139,7 +139,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
                 LOGGER.info("client node: \"{}\" removed", unresponsiveNode.getId());
 
-                LOGGER.info("send node unresponsive gossip to random nodes");
+                LOGGER.info("select random nodes to send node unresponsive gossip");
 
                 for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
                     messageSender.sendNodeUnresponsiveGossip(unresponsiveNode, n, hop);
@@ -158,8 +158,6 @@ public class ClusterManagerImpl implements ClusterManager {
                 knownNodes.add(connectedNode);
 
                 LOGGER.info("client node: \"{}\" added", connectedNode.getId());
-
-                LOGGER.info("send node discovered gossip to known nodes");
 
                 for (Node n : this.knownNodes) {
                     if (!n.getId().equals(connectedNode.getId())) {

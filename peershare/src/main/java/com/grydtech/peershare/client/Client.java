@@ -161,7 +161,7 @@ public class Client extends Thread {
         NodeDiscoveredGossip nodeDiscoveredGossip = new NodeDiscoveredGossip();
         nodeDiscoveredGossip.deserialize(message);
 
-        LOGGER.info("node: \"{}\" discovered gossip received: \"{}\"", nodeDiscoveredGossip.getDiscoveredNode().getId(), nodeDiscoveredGossip.getDiscoveredNode().getId());
+        LOGGER.info("node: \"{}\" discovered gossip received", nodeDiscoveredGossip.getDiscoveredNode().getId());
 
         clusterManager.nodeDiscovered(nodeDiscoveredGossip.getDiscoveredNode(), nodeDiscoveredGossip.getHop() + 1);
     }
@@ -170,7 +170,7 @@ public class Client extends Thread {
         NodeUnresponsiveGossip nodeUnresponsiveGossip = new NodeUnresponsiveGossip();
         nodeUnresponsiveGossip.deserialize(message);
 
-        LOGGER.info("node: \"{}\" unresponsive gossip received: \"{}\"", nodeUnresponsiveGossip.getUnresponsiveNode().getId(), nodeUnresponsiveGossip.getUnresponsiveNode().getId());
+        LOGGER.info("node: \"{}\" unresponsive gossip received", nodeUnresponsiveGossip.getUnresponsiveNode().getId());
 
         clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getHop() + 1);
     }
@@ -179,7 +179,7 @@ public class Client extends Thread {
         HeartBeatMessage heartBeatMessage = new HeartBeatMessage();
         heartBeatMessage.deserialize(message);
 
-        LOGGER.trace("heart beat message received from: \"{}\"", heartBeatMessage.getNode().getId());
+        LOGGER.trace("heart beat detected: \"{}\"", heartBeatMessage.getNode().getId());
 
         clusterManager.nodeAlive(heartBeatMessage.getNode());
     }
