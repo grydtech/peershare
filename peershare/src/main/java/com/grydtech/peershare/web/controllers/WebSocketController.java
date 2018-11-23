@@ -11,7 +11,6 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
@@ -23,9 +22,6 @@ import java.util.UUID;
 public class WebSocketController {
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketController.class);
 
-    @Value("${search.results}")
-    private String searchResults;
-
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final FileSearchManager fileSearchManager;
     private final ClusterManager clusterManager;
@@ -35,8 +31,6 @@ public class WebSocketController {
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.fileSearchManager = fileSearchManager;
         this.clusterManager = clusterManager;
-
-        this.sendRoutingTable();
     }
 
     @MessageMapping("/search")
@@ -48,11 +42,16 @@ public class WebSocketController {
         resultObservable.subscribe(fileSearchResult -> fileSearchResult.getFiles().forEach(f -> {
             SearchResult searchResult = new SearchResult(f.getId(), f.getName(), fileSearchResult.getNode().getHost(), fileSearchResult.getNode().getPort());
             SearchResponse searchResponse = new SearchResponse(searchRequest.getSearchId(), searchResult);
-            simpMessagingTemplate.convertAndSend(searchResults, searchResponse);
+            simpMessagingTemplate.convertAndSend("/topic/results", searchResponse);
         }));
     }
 
-    private void sendRoutingTable() {
+    @MessageMapping("/info")
+    public void info() {
+        LOGGER.info("info request received");
+
+        simpMessagingTemplate.convertAndSend("/topic/routing-table", new RoutingTableResponse(clusterManager.getConnectedCluster()));
+
         clusterManager.getConnectedClusterObservable().subscribe(nodes -> {
             simpMessagingTemplate.convertAndSend("/topic/routing-table", new RoutingTableResponse(nodes));
         });

@@ -18,7 +18,9 @@ stompClient.connect({}, function (frame1) {
         const response = JSON.parse(frame2.body);
 
         updateRoutingTable(response.table);
-    })
+    });
+
+    stompClient.send("/app/info");
 });
 
 function uuid() {
