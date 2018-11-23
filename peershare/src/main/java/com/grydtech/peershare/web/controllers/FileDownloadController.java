@@ -1,7 +1,7 @@
 package com.grydtech.peershare.web.controllers;
 
 import com.grydtech.peershare.files.models.FileInfo;
-import com.grydtech.peershare.files.services.FileStoreManager;
+import com.grydtech.peershare.files.services.FileStore;
 import com.grydtech.peershare.files.services.TempFileCreator;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -26,12 +26,12 @@ public class FileDownloadController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FileDownloadController.class);
 
-    private final FileStoreManager fileStoreManager;
+    private final FileStore fileStore;
     private final TempFileCreator tempFileCreator;
 
     @Autowired
-    public FileDownloadController(FileStoreManager fileStoreManager, TempFileCreator tempFileCreator) {
-        this.fileStoreManager = fileStoreManager;
+    public FileDownloadController(FileStore fileStore, TempFileCreator tempFileCreator) {
+        this.fileStore = fileStore;
         this.tempFileCreator = tempFileCreator;
     }
 
@@ -39,9 +39,9 @@ public class FileDownloadController {
     public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String id) throws IOException {
         LOGGER.info("file download request received for fileId: \"{}\"", id);
 
-        if (!fileStoreManager.has(id)) return ResponseEntity.notFound().build();
+        if (!fileStore.has(id)) return ResponseEntity.notFound().build();
 
-        FileInfo fileInfo = fileStoreManager.get(id);
+        FileInfo fileInfo = fileStore.get(id);
         File file = tempFileCreator.createTempFile(fileInfo.getName());
 
         String md5Hash = DigestUtils.md5Hex(new FileInputStream(file));

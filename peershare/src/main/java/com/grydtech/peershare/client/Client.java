@@ -14,7 +14,6 @@ import com.grydtech.peershare.client.models.search.FileSearchResponse;
 import com.grydtech.peershare.client.services.ClusterManager;
 import com.grydtech.peershare.client.services.FileSearchManager;
 import com.grydtech.peershare.client.services.MessageSender;
-import com.grydtech.peershare.files.services.FileStoreManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,15 +36,13 @@ public class Client extends Thread {
     private final DatagramSocket udpSocket;
     private final ClusterManager clusterManager;
     private final MessageSender messageSender;
-    private final FileStoreManager fileStoreManager;
     private final FileSearchManager fileSearchManager;
 
     @Autowired
-    public Client(DatagramSocket udpSocket, ClusterManager clusterManager, MessageSender messageSender, FileStoreManager fileStoreManager, FileSearchManager fileSearchManager) {
+    public Client(DatagramSocket udpSocket, ClusterManager clusterManager, MessageSender messageSender, FileSearchManager fileSearchManager) {
         this.udpSocket = udpSocket;
         this.clusterManager = clusterManager;
         this.messageSender = messageSender;
-        this.fileStoreManager = fileStoreManager;
         this.fileSearchManager = fileSearchManager;
     }
 
@@ -56,16 +53,16 @@ public class Client extends Thread {
                 clusterManager.leave();
                 clusterManager.unregister();
 
-                fileStoreManager.stopService();
                 clusterManager.stopService();
+                fileSearchManager.stopService();
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);
             }
         }));
 
         try {
-            fileStoreManager.startService();
             clusterManager.startService();
+            fileSearchManager.startService();
 
             clusterManager.unregister();
             clusterManager.register();

@@ -6,7 +6,7 @@ import com.grydtech.peershare.client.services.ClusterManager;
 import com.grydtech.peershare.client.services.MessageSender;
 import com.grydtech.peershare.client.services.FileSearchManager;
 import com.grydtech.peershare.files.models.FileInfo;
-import com.grydtech.peershare.files.services.FileStoreManager;
+import com.grydtech.peershare.files.services.FileStore;
 import io.reactivex.Observable;
 import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
@@ -33,14 +33,14 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private int searchTimeout;
 
     private final Node myNode;
-    private final FileStoreManager fileStoreManager;
+    private final FileStore fileStore;
     private final ClusterManager clusterManager;
     private final MessageSender messageSender;
 
     @Autowired
-    public FileSearchManagerImpl(Node myNode, FileStoreManager fileStoreManager, ClusterManager clusterManager, MessageSender messageSender) {
+    public FileSearchManagerImpl(Node myNode, FileStore fileStore, ClusterManager clusterManager, MessageSender messageSender) {
         this.myNode = myNode;
-        this.fileStoreManager = fileStoreManager;
+        this.fileStore = fileStore;
         this.clusterManager = clusterManager;
         this.messageSender = messageSender;
     }
@@ -48,7 +48,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
     @Override
     public Observable<FileSearchResult> submitSearch(UUID searchId, String keyword) throws IOException {
         BehaviorSubject<FileSearchResult> behaviorSubject = BehaviorSubject.create();
-        List<FileInfo> myFiles = fileStoreManager.search(keyword);
+        List<FileInfo> myFiles = fileStore.search(keyword);
 
         LOGGER.info("file search request submitted: \"{}\"", keyword);
 
@@ -92,7 +92,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
     @Override
     public void acceptSearchRequest(UUID searchId, String keyWord, Node startNode, int hop) throws IOException {
-        List<String> fileNames = fileStoreManager.search(keyWord).stream().map(FileInfo::getName).collect(Collectors.toList());
+        List<String> fileNames = fileStore.search(keyWord).stream().map(FileInfo::getName).collect(Collectors.toList());
 
         messageSender.sendFileSearchResponse(fileNames, startNode, searchId, hop);
 

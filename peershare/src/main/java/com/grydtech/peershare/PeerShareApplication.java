@@ -1,6 +1,7 @@
 package com.grydtech.peershare;
 
 import com.grydtech.peershare.client.Client;
+import com.grydtech.peershare.files.services.FileStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,14 +16,17 @@ public class PeerShareApplication {
     private static final Logger LOGGER = LoggerFactory.getLogger(PeerShareApplication.class);
 
     private final Client Client;
+    private final FileStore fileStore;
 
     @Autowired
-    public PeerShareApplication(Client Client) {
+    public PeerShareApplication(Client Client, FileStore fileStore) {
         this.Client = Client;
+        this.fileStore = fileStore;
     }
 
     @EventListener
     public void afterApplicationReady(ApplicationReadyEvent event) {
+        this.fileStore.index();
         this.Client.start();
     }
 
