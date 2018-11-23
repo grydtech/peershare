@@ -18,6 +18,10 @@ public interface MessageSender {
 
     void sendJoinResponse(Node destinationNode, UUID requestId) throws IOException;
 
+    void sendLeaveRequest(Node destinationNode) throws IOException;
+
+    void sendLeaveResponse(Node destinationNode, UUID requestId) throws IOException;
+
     void sendNodeDiscoveredGossip(Node discoveredNode, Node destinationNode, int hop) throws IOException;
 
     void sendNodeUnresponsiveGossip(Node unresponsiveNode, Node destinationNode, int hop) throws IOException;

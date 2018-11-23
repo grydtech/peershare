@@ -104,8 +104,11 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public void leave() {
+    public void leave() throws IOException {
         synchronized (this) {
+            for (Node n: this.knownNodes) {
+                this.messageSender.sendLeaveRequest(n);
+            }
             this.knownNodes.clear();
         }
     }
@@ -167,6 +170,13 @@ public class ClusterManagerImpl implements ClusterManager {
             } else {
                 LOGGER.warn("node already connected");
             }
+        }
+    }
+
+    @Override
+    public void nodeDisconnected(Node disconnectedNode) {
+        synchronized (this) {
+            knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
         }
     }
 

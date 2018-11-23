@@ -5,9 +5,7 @@ import com.grydtech.peershare.client.models.bootstrap.*;
 import com.grydtech.peershare.client.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.client.models.gossip.NodeUnresponsiveGossip;
 import com.grydtech.peershare.client.models.hearbeat.HeartBeatMessage;
-import com.grydtech.peershare.client.models.peer.PeerJoinRequest;
-import com.grydtech.peershare.client.models.peer.PeerJoinResponse;
-import com.grydtech.peershare.client.models.peer.PeerJoinResponseStatus;
+import com.grydtech.peershare.client.models.peer.*;
 import com.grydtech.peershare.client.models.search.FileSearchRequest;
 import com.grydtech.peershare.client.models.search.FileSearchResponse;
 import com.grydtech.peershare.client.models.search.FileSearchResponseStatus;
@@ -105,6 +103,24 @@ public class MessageSenderImpl implements MessageSender {
         LOGGER.info("send join response to: \"{}\"", destinationNode.getId());
 
         udpMessageSender.sendMessage(peerJoinResponse, destinationNode);
+    }
+
+    @Override
+    public void sendLeaveRequest(Node destinationNode) throws IOException {
+        PeerLeaveRequest peerLeaveRequest = new PeerLeaveRequest(myNode);
+
+        LOGGER.info("send leave request to: \"{}\"", destinationNode.getId());
+
+        udpMessageSender.sendMessage(peerLeaveRequest, destinationNode);
+    }
+
+    @Override
+    public void sendLeaveResponse(Node destinationNode, UUID requestId) throws IOException {
+        PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse(PeerJoinResponseStatus.SUCCESSFUL, requestId);
+
+        LOGGER.info("send leave response to: \"{}\"", destinationNode.getId());
+
+        udpMessageSender.sendMessage(peerLeaveResponse, destinationNode);
     }
 
     @Override

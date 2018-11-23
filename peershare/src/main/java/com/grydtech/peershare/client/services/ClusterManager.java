@@ -16,13 +16,15 @@ public interface ClusterManager extends Manager {
 
     void join() throws IllegalCommandException, IOException;
 
-    void leave();
+    void leave() throws IOException;
 
     void nodeDiscovered(Node discoveredNode, int hop) throws IOException;
 
     void nodeUnresponsive(Node unresponsiveNode, int hop) throws IOException;
 
     void nodeConnected(Node connectedNode) throws IOException;
+
+    void nodeDisconnected(Node disconnectedNode);
 
     void nodeAlive(Node aliveNode) throws IOException;
 

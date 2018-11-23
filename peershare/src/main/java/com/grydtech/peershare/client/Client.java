@@ -7,6 +7,8 @@ import com.grydtech.peershare.client.models.gossip.NodeUnresponsiveGossip;
 import com.grydtech.peershare.client.models.hearbeat.HeartBeatMessage;
 import com.grydtech.peershare.client.models.peer.PeerJoinRequest;
 import com.grydtech.peershare.client.models.peer.PeerJoinResponse;
+import com.grydtech.peershare.client.models.peer.PeerLeaveRequest;
+import com.grydtech.peershare.client.models.peer.PeerLeaveResponse;
 import com.grydtech.peershare.client.models.search.FileSearchRequest;
 import com.grydtech.peershare.client.models.search.FileSearchResponse;
 import com.grydtech.peershare.client.services.ClusterManager;
@@ -116,6 +118,12 @@ public class Client extends Thread {
             case JOIN_OK:
                 handleJoinResponse(message);
                 break;
+            case LEAVE:
+                handleLeaveRequest(message);
+                break;
+            case LEAVE_OK:
+                handleLeaveResponse(message);
+                break;
             case SEARCH:
                 handleFileSearchRequest(message);
                 break;
@@ -141,10 +149,10 @@ public class Client extends Thread {
         PeerJoinRequest peerJoinRequest = new PeerJoinRequest();
         peerJoinRequest.deserialize(message);
 
-        LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNewNode().getId());
+        LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNode().getId());
 
-        clusterManager.nodeConnected(peerJoinRequest.getNewNode());
-        messageSender.sendJoinResponse(peerJoinRequest.getNewNode(), peerJoinRequest.getMessageId());
+        clusterManager.nodeConnected(peerJoinRequest.getNode());
+        messageSender.sendJoinResponse(peerJoinRequest.getNode(), peerJoinRequest.getMessageId());
     }
 
     private void handleJoinResponse(String message) throws IOException {
@@ -155,6 +163,25 @@ public class Client extends Thread {
         LOGGER.info("join response received from: \"{}\"", destinationNode.getId());
 
         clusterManager.nodeConnected(destinationNode);
+    }
+
+    private void handleLeaveRequest(String message) throws IOException {
+        PeerLeaveRequest peerLeaveRequest = new PeerLeaveRequest();
+        peerLeaveRequest.deserialize(message);
+
+        LOGGER.info("leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
+
+        clusterManager.nodeDisconnected(peerLeaveRequest.getNode());
+        messageSender.sendLeaveResponse(peerLeaveRequest.getNode(), peerLeaveRequest.getMessageId());
+    }
+
+    private void handleLeaveResponse(String message) {
+        PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse();
+        peerLeaveResponse.deserialize(message);
+
+        Node destinationNode = messageSender.getDestinationNode(peerLeaveResponse.getMessageId().toString());
+
+        LOGGER.info("leave response: \"{}\" received from: \"{}\"", peerLeaveResponse.getStatus().toString(), destinationNode.getId());
     }
 
     private void handleNodeDiscoveredGossip(String message) throws IOException {
