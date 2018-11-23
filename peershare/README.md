@@ -13,11 +13,17 @@ java -jar peershare-1.0-SNAPSHOT.jar
 -Dfile-store.input-file (file contains file names to index)
 #### cluster management
 -Dbootstrap.host (bootstrap server address)
--Dbootstrap.httpPort (bootstrap server httpPort)
+-Dbootstrap.port (bootstrap server port)
 #### server
 -Dserver.host (application host address)
--Dserver.httpPort (application server httpPort - for spring boot http server)
+-Dserver.port (application server port - spring boot http port)
 -Dserver.name (application server unique username)
-#### cluster manager
--Dcluster-manager.ttl (time to live value for inactive noded)
+#### cluster
+-Dnode.ttl (time to live value for inactive nodes)
+-Dnode.hear-beat-interval (interval to send heart beats)
+#### messages
+-Dgossip.mx-hops (hops limit to terminate gossip messages)
+-Dsearch.max-hops (hops limit to terminate search messages)
+-Dsearch.timeout (maximum search waiting time)
+-Dsearch.results (web socket topic to push search search results)
 
