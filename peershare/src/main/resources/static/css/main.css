@@ -1,0 +1,26 @@
+.logo {
+    height: 50px;
+    width: auto;
+}
+
+.logo-text {
+    font-size: 30px;
+    margin-left: 10px;
+}
+
+.logo-text-small {
+    font-size: 15px;
+}
+
+.no-results-area {
+    width: 100%;
+}
+
+.no-results-image {
+    width: 100%;
+    height: auto;
+}
+
+.results-area {
+    margin-top: 120px;
+}
