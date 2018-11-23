@@ -30,7 +30,7 @@ public class RegisterResponse implements DeserializableMessage {
         this.nodes = new ArrayList<>();
 
         if (this.status == BootstrapResponseStatus.SUCCESSFUL) {
-            for (int i = 3; i < parts.length - 1; i = i + 2) {
+            for (int i = 3; i < parts.length - 1; i = i + 3) {
                 Node node = new Node(parts[i], Integer.parseInt(parts[i + 1]));
                 this.nodes.add(node);
             }
