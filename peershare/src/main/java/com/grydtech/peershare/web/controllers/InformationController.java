@@ -31,7 +31,7 @@ public class InformationController {
     public ResponseEntity<List<Node>> getRoutingTable() {
         LOGGER.info("get routing table request received");
 
-        List<Node> knownNodes = clusterManager.getConnectedCluster().blockingLast();
+        List<Node> knownNodes = clusterManager.getConnectedCluster();
 
         LOGGER.info("send routing table count: \"{}\"", knownNodes.size());
 

@@ -53,7 +53,7 @@ public class WebSocketController {
     }
 
     private void sendRoutingTable() {
-        clusterManager.getConnectedCluster().subscribe(nodes -> {
+        clusterManager.getConnectedClusterObservable().subscribe(nodes -> {
             simpMessagingTemplate.convertAndSend("/topic/routing-table", new RoutingTableResponse(nodes));
         });
     }

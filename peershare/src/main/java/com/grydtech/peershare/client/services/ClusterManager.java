@@ -29,5 +29,7 @@ public interface ClusterManager extends Manager {
 
     void nodeAlive(Node aliveNode) throws IOException;
 
-    Observable<List<Node>> getConnectedCluster();
+    Observable<List<Node>> getConnectedClusterObservable();
+
+    List<Node> getConnectedCluster();
 }

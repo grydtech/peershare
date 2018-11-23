@@ -40,7 +40,7 @@ public class FileStoreManagerImpl implements FileStoreManager {
     public List<FileInfo> search(String keyword) {
         List<FileInfo> files = new ArrayList<>();
         fileIndex.values().stream()
-                .filter(f -> f.getName().toLowerCase().equals(keyword.toLowerCase()))
+                .filter(f -> f.getName().toLowerCase().contains(keyword.toLowerCase()))
                 .forEach(files::add);
 
         return files;

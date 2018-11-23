@@ -191,8 +191,13 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public Observable<List<Node>> getConnectedCluster() {
+    public Observable<List<Node>> getConnectedClusterObservable() {
         return this.knownNodesBehaviourSubject;
+    }
+
+    @Override
+    public List<Node> getConnectedCluster() {
+        return this.knownNodes;
     }
 
     @Override
