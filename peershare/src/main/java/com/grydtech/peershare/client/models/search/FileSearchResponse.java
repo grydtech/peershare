@@ -6,10 +6,8 @@ import com.grydtech.peershare.client.models.Node;
 import com.grydtech.peershare.shared.models.Message;
 import com.grydtech.peershare.shared.models.SerializableMessage;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class FileSearchResponse extends Message implements SerializableMessage, DeserializableMessage {
 
@@ -58,14 +56,16 @@ public class FileSearchResponse extends Message implements SerializableMessage, 
         this.fileNames = new ArrayList<>();
 
         if (this.status == FileSearchResponseStatus.SUCCESSFUL) {
-            fileNames.addAll(Arrays.asList(parts).subList(7, parts.length));
+            for (String encoded: Arrays.asList(parts).subList(7, parts.length)) {
+                fileNames.add(new String(Base64.getDecoder().decode(encoded.getBytes()), StandardCharsets.UTF_8));
+            }
         }
     }
 
     @Override
     public String serialize() {
         StringBuilder sb = new StringBuilder(String.format("%s %s %d %s %d %d", this.messageId.toString(), Command.SEARCH_OK.toString(), fileNames.size(), this.node.getHost(), this.node.getPort(), this.hops));
-        fileNames.forEach(fn -> sb.append(" ").append(fn));
+        fileNames.forEach(fn -> sb.append(" ").append(new String(Base64.getEncoder().encode(fn.getBytes()), StandardCharsets.UTF_8)));
 
         String s = sb.toString();
         return String.format("%04d %s", s.length() + 5, s);
