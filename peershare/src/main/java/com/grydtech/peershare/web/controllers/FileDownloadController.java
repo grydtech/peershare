@@ -44,9 +44,6 @@ public class FileDownloadController {
         FileInfo fileInfo = fileStore.get(id);
         File file = tempFileCreator.createTempFile(fileInfo.getName());
 
-        String md5Hash = DigestUtils.md5Hex(new FileInputStream(file));
-        LOGGER.info("startService sending file, checksum value (md5): \"{}\"", md5Hash);
-
         InputStreamResource inputStreamResource = new InputStreamResource(new FileInputStream(file));
 
         return ResponseEntity.ok()

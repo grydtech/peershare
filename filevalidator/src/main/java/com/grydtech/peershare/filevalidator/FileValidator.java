@@ -6,21 +6,31 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 
 public class FileValidator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FileValidator.class);
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
         File file = new File(args[0]);
+        String mode = args[2];
 
-        String md5Hash = DigestUtils.md5Hex(new FileInputStream(file));
+        String generatedHash;
 
-        LOGGER.info("generated checksum (md5) for file: \"{}\"", md5Hash);
-        LOGGER.info("validate generated value: \"{}\" against passed value: \"{}\"", md5Hash, args[1]);
+        if ("md5".equals(mode.toLowerCase())) {
+            generatedHash = DigestUtils.md5Hex(new FileInputStream(file)).toUpperCase();
+        } else if ("sha1".equals(mode.toLowerCase())) {
+            generatedHash = DigestUtils.sha1Hex(new FileInputStream(file)).toUpperCase();
+        } else {
+            LOGGER.error("unknown command, please send a command similar to this \"java -jar filevalidator-1.0-SNAPSHOT.jar [hash-value] [md5 | sha1]\"");
+            throw new RuntimeException("unknown command");
+        }
 
-        if (md5Hash.equals(args[1])) {
+        LOGGER.info("generated checksum ({}) for file: \"{}\"", mode, generatedHash);
+
+        LOGGER.info("validate ({}) generated value: \"{}\" against passed value: \"{}\"", mode, generatedHash, args[1]);
+
+        if (generatedHash.equals(args[1])) {
             LOGGER.info("validation successful");
         } else {
             LOGGER.info("validation failed");
