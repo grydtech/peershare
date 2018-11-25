@@ -32,7 +32,7 @@ public class NodeAliveGossip extends Message implements SerializableMessage, Des
     }
 
     public boolean isMaxHopsReached(int maxHops) {
-        return hop >= maxHops;
+        return hop > maxHops;
     }
 
     @Override

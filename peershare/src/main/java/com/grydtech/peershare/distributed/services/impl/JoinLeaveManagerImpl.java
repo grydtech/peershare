@@ -26,6 +26,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(JoinLeaveManagerImpl.class);
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+
     private final Map<String, BehaviorSubject<Boolean>> requestMap = new HashMap<>();
     private final List<MessageInfo> messages = new ArrayList<>();
 
@@ -104,6 +105,11 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     @Override
     public synchronized void submitResponse(UUID requestId, PeerResponseStatus status) {
         BehaviorSubject<Boolean> behaviorSubject = requestMap.get(requestId.toString());
+
+        if (behaviorSubject == null) {
+            LOGGER.warn("request: \"{}\" timed out", requestId.toString());
+            return;
+        }
 
         LOGGER.trace("emit received response via behaviour subject");
 

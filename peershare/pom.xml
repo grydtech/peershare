@@ -21,6 +21,7 @@
         <java.version>1.8</java.version>
         <rxjava.version>2.2.3</rxjava.version>
         <commons-codec.version>1.11</commons-codec.version>
+        <slf4j.version>1.8.0-beta2</slf4j.version>
     </properties>
 
     <dependencies>
@@ -35,6 +36,20 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
         <!-- end spring dependencies -->
+
+        <!-- start loging dependencies -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <!-- end logging dependencies -->
 
         <!-- start codec dependencies -->
         <dependency>

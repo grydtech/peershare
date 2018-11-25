@@ -40,6 +40,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final ScheduledExecutorService joinExecutor = Executors.newSingleThreadScheduledExecutor();
+
     private final List<Node> bootstrapNodes = new ArrayList<>();
     private final List<Node> knownNodes = new ArrayList<>();
     private final BehaviorSubject<List<Node>> knownNodesBehaviourSubject = BehaviorSubject.create();
@@ -201,6 +202,8 @@ public class ClusterManagerImpl implements ClusterManager {
             for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
                 sendNodeUnresponsiveGossip(unresponsiveNode, n, hop + 1);
             }
+        } else {
+            LOGGER.warn("unresponsive node: \"{}\" already removed from cluster", unresponsiveNode.getId());
         }
     }
 

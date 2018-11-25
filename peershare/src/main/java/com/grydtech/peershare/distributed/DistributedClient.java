@@ -1,9 +1,9 @@
 package com.grydtech.peershare.distributed;
 
 import com.grydtech.peershare.distributed.models.Command;
+import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
-import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinRequest;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinResponse;
 import com.grydtech.peershare.distributed.models.peer.PeerLeaveRequest;
@@ -14,42 +14,40 @@ import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.distributed.services.JoinLeaveManager;
 import com.grydtech.peershare.report.services.Reporter;
+import com.grydtech.peershare.shared.services.UDPMessageListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Component
-public class DistributedClient extends Thread {
+public class DistributedClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DistributedClient.class);
 
-    private ExecutorService executorService = Executors.newCachedThreadPool();
+    private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
-    private final DatagramSocket udpSocket;
+    private final UDPMessageListener udpMessageListener;
     private final ClusterManager clusterManager;
     private final JoinLeaveManager joinLeaveManager;
     private final FileSearchManager fileSearchManager;
     private final Reporter reporter;
 
     @Autowired
-    public DistributedClient(DatagramSocket udpSocket, ClusterManager clusterManager, JoinLeaveManager joinLeaveManager, FileSearchManager fileSearchManager, Reporter reporter) {
-        this.udpSocket = udpSocket;
+    public DistributedClient(UDPMessageListener udpMessageListener, ClusterManager clusterManager,
+                             JoinLeaveManager joinLeaveManager, FileSearchManager fileSearchManager, Reporter reporter) {
+        this.udpMessageListener = udpMessageListener;
         this.clusterManager = clusterManager;
         this.joinLeaveManager = joinLeaveManager;
         this.fileSearchManager = fileSearchManager;
         this.reporter = reporter;
     }
 
-    @Override
-    public void run() {
+    public void start() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 clusterManager.leave();
@@ -76,36 +74,7 @@ public class DistributedClient extends Thread {
             Runtime.getRuntime().exit(0);
         }
 
-        byte[] buf = new byte[256];
-
-        LOGGER.info("message acceptor started");
-
-        try {
-            while (true) {
-                DatagramPacket packet = new DatagramPacket(buf, buf.length);
-
-                try {
-                    udpSocket.receive(packet);
-                } catch (SocketException e) {
-                    LOGGER.error(e.getMessage(), e);
-                    break;
-                }
-
-                String received = new String(packet.getData(), 0, packet.getLength());
-
-                LOGGER.trace("UDP packet received: \"{}\"", received);
-
-                executorService.submit(() -> {
-                    try {
-                        decodeMessage(received);
-                    } catch (IOException e) {
-                        LOGGER.error(e.getMessage(), e);
-                    }
-                });
-            }
-        } catch (IOException e) {
-            LOGGER.error(e.getMessage(), e);
-        }
+        udpMessageListener.listen().subscribe(this::decodeMessage);
     }
 
     private void decodeMessage(String message) throws IOException {

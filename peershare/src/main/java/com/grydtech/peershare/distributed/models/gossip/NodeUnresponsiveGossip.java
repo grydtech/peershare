@@ -1,8 +1,8 @@
 package com.grydtech.peershare.distributed.models.gossip;
 
 import com.grydtech.peershare.distributed.models.Command;
-import com.grydtech.peershare.shared.models.DeserializableMessage;
 import com.grydtech.peershare.distributed.models.Node;
+import com.grydtech.peershare.shared.models.DeserializableMessage;
 import com.grydtech.peershare.shared.models.Message;
 import com.grydtech.peershare.shared.models.SerializableMessage;
 
@@ -33,7 +33,7 @@ public class NodeUnresponsiveGossip extends Message implements SerializableMessa
     }
 
     public boolean isMaxHopsReached(int maxHops) {
-        return hop >= maxHops;
+        return hop > maxHops;
     }
 
     @Override

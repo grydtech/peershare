@@ -40,7 +40,7 @@ public class FileSearchRequest extends Message implements SerializableMessage, D
     }
 
     public boolean isMaxHopsReached(int maxHops) {
-        return hop >= maxHops;
+        return hop > maxHops;
     }
 
     @Override

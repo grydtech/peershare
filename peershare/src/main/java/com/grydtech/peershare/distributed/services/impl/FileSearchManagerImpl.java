@@ -32,6 +32,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(FileSearchManagerImpl.class);
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+
     private final Map<String, BehaviorSubject<FileSearchResult>> searchMap = new HashMap<>();
     private final List<MessageInfo> messages = new ArrayList<>();
 
