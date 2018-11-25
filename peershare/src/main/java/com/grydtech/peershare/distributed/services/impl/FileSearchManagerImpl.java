@@ -1,5 +1,6 @@
 package com.grydtech.peershare.distributed.services.impl;
 
+import com.grydtech.peershare.distributed.models.MessageInfo;
 import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,8 +32,8 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(FileSearchManagerImpl.class);
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    private final Map<String, BehaviorSubject<FileSearchResult>> resultsMap = new HashMap<>();
-    private final Queue<String> searchQueue = new ConcurrentLinkedQueue<>();
+    private final Map<String, BehaviorSubject<FileSearchResult>> searchMap = new HashMap<>();
+    private final List<MessageInfo> messages = new ArrayList<>();
 
     @Value("${search.timeout}")
     private int searchTimeout;
@@ -64,12 +64,12 @@ public class FileSearchManagerImpl implements FileSearchManager {
         synchronized (this) {
             LOGGER.trace("add search; \"{}\" to queue for cleanup", searchId);
 
-            searchQueue.add(searchId.toString());
+            messages.add(new MessageInfo(searchId));
 
             FileSearchResult fileSearchResult = new FileSearchResult(myNode, myFiles, 0);
             behaviorSubject.onNext(fileSearchResult);
 
-            resultsMap.put(searchId.toString(), behaviorSubject);
+            searchMap.put(searchId.toString(), behaviorSubject);
         }
 
         LOGGER.info("send file search request to known nodes");
@@ -84,7 +84,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
     @Override
     public void submitSearchResult(UUID searchId, List<String> discoveredFiles, Node node, int hops) {
         synchronized (this) {
-            BehaviorSubject<FileSearchResult> behaviorSubject = resultsMap.get(searchId.toString());
+            BehaviorSubject<FileSearchResult> behaviorSubject = searchMap.get(searchId.toString());
 
             if (behaviorSubject != null) {
                 List<FileInfo> files = discoveredFiles.stream().map(FileInfo::new).collect(Collectors.toList());
@@ -118,12 +118,18 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         scheduledExecutorService.scheduleAtFixedRate(() -> {
             synchronized (this) {
-                String key = searchQueue.remove();
-                BehaviorSubject<FileSearchResult> behaviorSubject = resultsMap.get(key);
-                resultsMap.remove(key);
-                behaviorSubject.onComplete();
+                List<MessageInfo> expiredMessages = messages.stream().filter(m -> m.isExpired(searchTimeout)).collect(Collectors.toList());
 
-                LOGGER.trace("search: \"{}\" send completed response and remove", key);
+                expiredMessages.forEach(em -> {
+                    String key = em.getMessageId().toString();
+                    BehaviorSubject<FileSearchResult> behaviorSubject = searchMap.get(key);
+                    searchMap.remove(key);
+                    behaviorSubject.onComplete();
+
+                    LOGGER.trace("search: \"{}\" send completed response and remove", key);
+                });
+
+                messages.removeAll(expiredMessages);
             }
         }, searchTimeout, searchTimeout, TimeUnit.SECONDS);
 
@@ -132,12 +138,12 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
     @Override
     public void stopService() {
-        this.resultsMap.forEach((key, value) -> {
+        this.searchMap.forEach((key, value) -> {
             value.onComplete();
         });
 
-        this.resultsMap.clear();
-        this.searchQueue.clear();
+        this.searchMap.clear();
+        this.messages.clear();
 
         this.scheduledExecutorService.shutdown();
 

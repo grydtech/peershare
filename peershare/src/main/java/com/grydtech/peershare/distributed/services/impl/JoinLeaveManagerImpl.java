@@ -1,5 +1,6 @@
 package com.grydtech.peershare.distributed.services.impl;
 
+import com.grydtech.peershare.distributed.models.MessageInfo;
 import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.peer.*;
 import com.grydtech.peershare.distributed.services.JoinLeaveManager;
@@ -14,10 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class JoinLeaveManagerImpl implements JoinLeaveManager {
@@ -26,7 +27,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final Map<String, BehaviorSubject<Boolean>> requestMap = new HashMap<>();
-    private final Queue<String> requestQueue = new ConcurrentLinkedQueue<>();
+    private final List<MessageInfo> messages = new ArrayList<>();
 
     @Value("${join.timeout}")
     private int joinTimeout;
@@ -50,7 +51,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
         synchronized (this) {
             LOGGER.trace("add request; \"{}\" to queue for cleanup", peerJoinRequest.getMessageId());
 
-            requestQueue.add(peerJoinRequest.getMessageId().toString());
+            messages.add(new MessageInfo(peerJoinRequest.getMessageId()));
             requestMap.put(peerJoinRequest.getMessageId().toString(), behaviorSubject);
 
             LOGGER.info("send join request to: \"{}\"", destinationNode.getId());
@@ -80,7 +81,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
         synchronized (this) {
             LOGGER.trace("add request; \"{}\" to queue for cleanup", peerLeaveRequest.getMessageId());
 
-            requestQueue.add(peerLeaveRequest.getMessageId().toString());
+            messages.add(new MessageInfo(peerLeaveRequest.getMessageId()));
             requestMap.put(peerLeaveRequest.getMessageId().toString(), behaviorSubject);
 
             LOGGER.info("send leave request to: \"{}\"", destinationNode.getId());
@@ -111,6 +112,9 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
         } else {
             behaviorSubject.onNext(false);
         }
+
+        requestMap.remove(requestId.toString());
+        messages.removeIf(messageInfo -> messageInfo.getMessageId().toString().equals(requestId.toString()));
     }
 
     @Override
@@ -119,12 +123,18 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
 
         scheduledExecutorService.scheduleAtFixedRate(() -> {
             synchronized (this) {
-                String key = requestQueue.remove();
-                BehaviorSubject<Boolean> behaviorSubject = requestMap.get(key);
-                requestMap.remove(key);
-                behaviorSubject.onComplete();
+                List<MessageInfo> expiredMessages = messages.stream().filter(m -> m.isExpired(joinTimeout)).collect(Collectors.toList());
 
-                LOGGER.trace("join leave request: \"{}\" send completed response and remove", key);
+                expiredMessages.forEach(em -> {
+                    String key = em.getMessageId().toString();
+                    BehaviorSubject<Boolean> behaviorSubject = requestMap.get(key);
+                    requestMap.remove(key);
+                    behaviorSubject.onComplete();
+
+                    LOGGER.trace("join leave request: \"{}\" send completed response and remove", key);
+                });
+
+                messages.removeAll(expiredMessages);
             }
         }, joinTimeout, joinTimeout, TimeUnit.SECONDS);
 
@@ -138,7 +148,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
         });
 
         this.requestMap.clear();
-        this.requestQueue.clear();
+        this.messages.clear();
 
         this.scheduledExecutorService.shutdown();
 
