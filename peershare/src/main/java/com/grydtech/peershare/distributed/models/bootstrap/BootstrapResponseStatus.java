@@ -8,21 +8,16 @@ public enum BootstrapResponseStatus {
     UNKNOWN;
 
     public static BootstrapResponseStatus byCode(int code) {
-        switch (code) {
-            case 0:
-                return SUCCESSFUL;
-            case 1:
-                return SUCCESSFUL;
-            case 2:
-                return SUCCESSFUL;
-            case 9999:
-                return ERROR;
-            case 9998:
-                return ALREADY_REGISTERED;
-            case 9997:
-                return BOOTSTRAP_SERVER_FULL;
-            default:
-                return UNKNOWN;
+        if (code == 9999) {
+            return ERROR;
+        } else if (code == 9998) {
+            return ALREADY_REGISTERED;
+        } else if (code == 9997) {
+            return BOOTSTRAP_SERVER_FULL;
+        } else if (code >= 0 && code < 9996) {
+            return SUCCESSFUL;
+        } else {
+            return UNKNOWN;
         }
     }
 }

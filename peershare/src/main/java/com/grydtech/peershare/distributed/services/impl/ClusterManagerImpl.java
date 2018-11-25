@@ -194,9 +194,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
             LOGGER.info("unresponsive node: \"{}\" removed from cluster", unresponsiveNode.getId());
 
-            joinLeaveManager.submitJoinRequest(unresponsiveNode).subscribe(status -> {
-                if (status) nodeConnected(unresponsiveNode);
-            });
+            sendJoinRequest(unresponsiveNode);
 
             LOGGER.info("select random nodes to send node unresponsive gossip");
 

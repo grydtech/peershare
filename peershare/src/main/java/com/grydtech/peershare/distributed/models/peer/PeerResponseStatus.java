@@ -12,13 +12,12 @@ public enum PeerResponseStatus {
     }
 
     public static PeerResponseStatus byCode(int code) {
-        switch (code) {
-            case 0:
-                return SUCCESSFUL;
-            case 9999:
-                return COMMAND_ERROR;
-            default:
-                return UNKNOWN;
+        if (code == 0) {
+            return SUCCESSFUL;
+        } else if (code == 9999) {
+            return COMMAND_ERROR;
+        } else {
+            return UNKNOWN;
         }
     }
 
