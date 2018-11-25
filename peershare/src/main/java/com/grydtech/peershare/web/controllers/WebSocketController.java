@@ -1,8 +1,8 @@
 package com.grydtech.peershare.web.controllers;
 
-import com.grydtech.peershare.client.models.search.FileSearchResult;
-import com.grydtech.peershare.client.services.ClusterManager;
-import com.grydtech.peershare.client.services.FileSearchManager;
+import com.grydtech.peershare.distributed.models.search.FileSearchResult;
+import com.grydtech.peershare.distributed.services.ClusterManager;
+import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.web.models.RoutingTableResponse;
 import com.grydtech.peershare.web.models.SearchRequest;
 import com.grydtech.peershare.web.models.SearchResponse;

@@ -1,6 +1,6 @@
 package com.grydtech.peershare.shared.services.impl;
 
-import com.grydtech.peershare.client.models.Node;
+import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.shared.models.SerializableMessage;
 import com.grydtech.peershare.shared.services.TCPMessageSender;
 import org.slf4j.Logger;

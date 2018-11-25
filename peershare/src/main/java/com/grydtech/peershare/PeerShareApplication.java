@@ -1,6 +1,6 @@
 package com.grydtech.peershare;
 
-import com.grydtech.peershare.client.Client;
+import com.grydtech.peershare.distributed.DistributedClient;
 import com.grydtech.peershare.files.services.FileStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,19 +15,19 @@ public class PeerShareApplication {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PeerShareApplication.class);
 
-    private final Client Client;
+    private final com.grydtech.peershare.distributed.DistributedClient DistributedClient;
     private final FileStore fileStore;
 
     @Autowired
-    public PeerShareApplication(Client Client, FileStore fileStore) {
-        this.Client = Client;
+    public PeerShareApplication(DistributedClient DistributedClient, FileStore fileStore) {
+        this.DistributedClient = DistributedClient;
         this.fileStore = fileStore;
     }
 
     @EventListener
     public void afterApplicationReady(ApplicationReadyEvent event) {
         this.fileStore.index();
-        this.Client.start();
+        this.DistributedClient.start();
     }
 
     public static void main(String[] args) {

@@ -1,6 +1,6 @@
 package com.grydtech.peershare;
 
-import com.grydtech.peershare.client.models.Node;
+import com.grydtech.peershare.distributed.models.Node;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,6 +1,6 @@
 package com.grydtech.peershare.web.models;
 
-import com.grydtech.peershare.client.models.Node;
+import com.grydtech.peershare.distributed.models.Node;
 
 import java.util.List;
 
