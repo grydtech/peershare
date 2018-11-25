@@ -4,7 +4,7 @@ import com.grydtech.peershare.distributed.models.Command;
 import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
-import com.grydtech.peershare.distributed.models.hearbeat.HeartBeatMessage;
+import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinRequest;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinResponse;
 import com.grydtech.peershare.distributed.models.peer.PeerLeaveRequest;
@@ -13,7 +13,7 @@ import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
-import com.grydtech.peershare.distributed.services.MessageSender;
+import com.grydtech.peershare.distributed.services.MessageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,14 +35,14 @@ public class DistributedClient extends Thread {
 
     private final DatagramSocket udpSocket;
     private final ClusterManager clusterManager;
-    private final MessageSender messageSender;
+    private final MessageManager messageManager;
     private final FileSearchManager fileSearchManager;
 
     @Autowired
-    public DistributedClient(DatagramSocket udpSocket, ClusterManager clusterManager, MessageSender messageSender, FileSearchManager fileSearchManager) {
+    public DistributedClient(DatagramSocket udpSocket, ClusterManager clusterManager, MessageManager messageManager, FileSearchManager fileSearchManager) {
         this.udpSocket = udpSocket;
         this.clusterManager = clusterManager;
-        this.messageSender = messageSender;
+        this.messageManager = messageManager;
         this.fileSearchManager = fileSearchManager;
     }
 
@@ -133,7 +133,7 @@ public class DistributedClient extends Thread {
             case NODE_UNRESPONSIVE:
                 handleNodeUnresponsiveGossip(message);
                 break;
-            case HEART_BEAT:
+            case NODE_ALIVE:
                 handleHeartBeatMessage(message);
                 break;
             case UNKNOWN:
@@ -149,17 +149,19 @@ public class DistributedClient extends Thread {
         LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNode().getId());
 
         clusterManager.nodeConnected(peerJoinRequest.getNode());
-        messageSender.sendJoinResponse(peerJoinRequest.getNode(), peerJoinRequest.getMessageId());
+        messageManager.sendJoinResponse(peerJoinRequest.getNode(), peerJoinRequest.getMessageId());
     }
 
     private void handleJoinResponse(String message) throws IOException {
         PeerJoinResponse peerJoinResponse = new PeerJoinResponse();
         peerJoinResponse.deserialize(message);
-        Node destinationNode = messageSender.getDestinationNode(peerJoinResponse.getMessageId().toString());
+        PeerJoinRequest peerJoinRequest = (PeerJoinRequest) messageManager.getSentMessageById(peerJoinResponse.getMessageId().toString());
 
-        LOGGER.info("join response received from: \"{}\"", destinationNode.getId());
+        if (peerJoinRequest != null) {
+            LOGGER.info("join response received from: \"{}\"", peerJoinRequest.getNode().getId());
 
-        clusterManager.nodeConnected(destinationNode);
+            clusterManager.nodeConnected(peerJoinRequest.getNode());
+        }
     }
 
     private void handleLeaveRequest(String message) throws IOException {
@@ -169,16 +171,18 @@ public class DistributedClient extends Thread {
         LOGGER.info("leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
 
         clusterManager.nodeDisconnected(peerLeaveRequest.getNode());
-        messageSender.sendLeaveResponse(peerLeaveRequest.getNode(), peerLeaveRequest.getMessageId());
+        messageManager.sendLeaveResponse(peerLeaveRequest.getNode(), peerLeaveRequest.getMessageId());
     }
 
     private void handleLeaveResponse(String message) {
         PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse();
         peerLeaveResponse.deserialize(message);
 
-        Node destinationNode = messageSender.getDestinationNode(peerLeaveResponse.getMessageId().toString());
+        PeerLeaveRequest peerLeaveRequest = (PeerLeaveRequest) messageManager.getSentMessageById(peerLeaveResponse.getMessageId().toString());
 
-        LOGGER.info("leave response: \"{}\" received from: \"{}\"", peerLeaveResponse.getStatus().toString(), destinationNode.getId());
+        if (peerLeaveRequest != null) {
+            LOGGER.info("leave response received from: \"{}\"", peerLeaveRequest.getNode().getId());
+        }
     }
 
     private void handleNodeDiscoveredGossip(String message) throws IOException {
@@ -200,12 +204,12 @@ public class DistributedClient extends Thread {
     }
 
     private void handleHeartBeatMessage(String message) throws IOException {
-        HeartBeatMessage heartBeatMessage = new HeartBeatMessage();
-        heartBeatMessage.deserialize(message);
+        NodeAliveGossip nodeAliveGossip = new NodeAliveGossip();
+        nodeAliveGossip.deserialize(message);
 
-        LOGGER.trace("heart beat detected: \"{}\"", heartBeatMessage.getNode().getId());
+        LOGGER.trace("node: \"{}\" alive gossip received", nodeAliveGossip.getAliveNode().getId());
 
-        clusterManager.nodeAlive(heartBeatMessage.getNode());
+        clusterManager.nodeAlive(nodeAliveGossip.getAliveNode(), nodeAliveGossip.getHop() + 1);
     }
 
     private void handleFileSearchRequest(String message) throws IOException {

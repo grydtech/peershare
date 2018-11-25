@@ -29,10 +29,10 @@ class BootstrapServerConnection:
 
     def connect_to_bs(self):
         '''
-        Register node at bootstrap server.
+        Register aliveNode at bootstrap server.
         Args:
-            bs (Node): Bootstrap server node
-            me (Node): This node
+            bs (Node): Bootstrap server aliveNode
+            me (Node): This aliveNode
         Returns:
             list(Node) : List of other nodes in the distributed system
         Raises:
@@ -72,11 +72,11 @@ class BootstrapServerConnection:
         
     def unreg_from_bs(self):
         '''
-        Unregister node at bootstrap server.
+        Unregister aliveNode at bootstrap server.
         Args:
             bs (tuple(str, int)): Bootstrap server IP address and port as a tuple.
-            me (tuple(str, int)): This node's IP address and port as a tuple.
-            myname (str)        : This node's name
+            me (tuple(str, int)): This aliveNode's IP address and port as a tuple.
+            myname (str)        : This aliveNode's name
         Returns:
             list(tuple(str, int)) : List of other nodes in the distributed system
         Raises:

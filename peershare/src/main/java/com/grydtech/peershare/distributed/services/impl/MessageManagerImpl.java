@@ -4,13 +4,13 @@ import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.bootstrap.*;
 import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
-import com.grydtech.peershare.distributed.models.hearbeat.HeartBeatMessage;
+import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
 import com.grydtech.peershare.distributed.models.peer.*;
 import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponseStatus;
-import com.grydtech.peershare.distributed.services.FileSearchReporter;
-import com.grydtech.peershare.distributed.services.MessageSender;
+import com.grydtech.peershare.distributed.services.MessageManager;
+import com.grydtech.peershare.shared.models.Message;
 import com.grydtech.peershare.shared.services.TCPMessageSender;
 import com.grydtech.peershare.shared.services.UDPMessageSender;
 import org.slf4j.Logger;
@@ -20,17 +20,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Service
-public class MessageSenderImpl implements MessageSender {
+public class MessageManagerImpl implements MessageManager {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MessageSenderImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageManagerImpl.class);
 
-    private final Map<String, Node> nodeMap = new HashMap<>();
+    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private final Map<String, Message> requestMap = new HashMap<>();
+    private final Queue<String> requestQueue = new ConcurrentLinkedQueue<>();
 
     @Value("${server.name}")
     private String serviceName;
@@ -41,13 +44,16 @@ public class MessageSenderImpl implements MessageSender {
     @Value("${search.max-hops}")
     private int searchMaxHops;
 
+    @Value("${request.timeout}")
+    private int requestTimeout;
+
     private final UDPMessageSender udpMessageSender;
     private final TCPMessageSender tcpMessageSender;
     private final Node myNode;
     private final Node bootstrapNode;
 
     @Autowired
-    public MessageSenderImpl(UDPMessageSender udpMessageSender, TCPMessageSender tcpMessageSender, Node myNode, Node bootstrapNode) {
+    public MessageManagerImpl(UDPMessageSender udpMessageSender, TCPMessageSender tcpMessageSender, Node myNode, Node bootstrapNode) {
         this.udpMessageSender = udpMessageSender;
         this.tcpMessageSender = tcpMessageSender;
         this.myNode = myNode;
@@ -92,9 +98,9 @@ public class MessageSenderImpl implements MessageSender {
 
         LOGGER.info("send join request to: \"{}\"", destinationNode.getId());
 
-        nodeMap.put(peerJoinRequest.getMessageId().toString(), destinationNode);
-
         udpMessageSender.sendMessage(peerJoinRequest, destinationNode);
+
+        addRequestToQueue(peerJoinRequest);
     }
 
     @Override
@@ -113,6 +119,8 @@ public class MessageSenderImpl implements MessageSender {
         LOGGER.info("send leave request to: \"{}\"", destinationNode.getId());
 
         udpMessageSender.sendMessage(peerLeaveRequest, destinationNode);
+
+        addRequestToQueue(peerLeaveRequest);
     }
 
     @Override
@@ -122,6 +130,34 @@ public class MessageSenderImpl implements MessageSender {
         LOGGER.info("send leave response to: \"{}\"", destinationNode.getId());
 
         udpMessageSender.sendMessage(peerLeaveResponse, destinationNode);
+    }
+
+    @Override
+    public void sendFileSearchRequest(String keyword, Node startNode, Node destinationNode, UUID requestId, int hop) throws IOException {
+        FileSearchRequest fileSearchRequest = new FileSearchRequest(startNode, keyword, requestId, hop);
+
+        if (startNode.getId().equals(destinationNode.getId())) {
+            LOGGER.warn("cannot send search request to same node");
+            return;
+        } else if (fileSearchRequest.isMaxHopsReached(gossipMaxHops + 1)) {
+            LOGGER.warn("search max hop count reached");
+            return;
+        }
+
+        LOGGER.info("send search request: \"{}\" to: \"{}\"", keyword, destinationNode.getId());
+
+        udpMessageSender.sendMessage(fileSearchRequest, destinationNode);
+
+        addRequestToQueue(fileSearchRequest);
+    }
+
+    @Override
+    public void sendFileSearchResponse(List<String> fileList, Node destinationNode, UUID requestId, int hops) throws IOException {
+        FileSearchResponse fileSearchResponse = new FileSearchResponse(myNode, fileList, requestId, hops, FileSearchResponseStatus.fromCode(fileList.size()));
+
+        LOGGER.info("send search response: \"{}\" to: \"{}\"", fileList.toString(), destinationNode.getId());
+
+        udpMessageSender.sendMessage(fileSearchResponse, destinationNode);
     }
 
     @Override
@@ -159,42 +195,55 @@ public class MessageSenderImpl implements MessageSender {
     }
 
     @Override
-    public void sendFileSearchRequest(String keyword, Node startNode, Node destinationNode, UUID requestId, int hop) throws IOException {
-        FileSearchRequest fileSearchRequest = new FileSearchRequest(startNode, keyword, requestId, hop);
+    public void sendNodeAliveGossip(Node aliveNode, Node destinationNode, int hop) throws IOException {
+        NodeAliveGossip nodeAliveGossip = new NodeAliveGossip(aliveNode, hop);
 
-        if (startNode.getId().equals(destinationNode.getId())) {
-            LOGGER.warn("cannot send search request to same node");
+        if (aliveNode.getId().equals(destinationNode.getId())) {
+            LOGGER.warn("cannot send node: \"{}\" node alive gossip to same node: \"{}\"", aliveNode.getId(), destinationNode.getId());
             return;
-        } else if (fileSearchRequest.isMaxHopsReached(gossipMaxHops + 1)) {
-            LOGGER.warn("search max hop count reached");
+        } else if (nodeAliveGossip.isMaxHopsReached(gossipMaxHops + 1)) {
+            LOGGER.warn("gossip max hop count reached");
             return;
         }
 
-        LOGGER.info("send search request: \"{}\" to: \"{}\"", keyword, destinationNode.getId());
-
-        udpMessageSender.sendMessage(fileSearchRequest, destinationNode);
-    }
-
-    @Override
-    public void sendFileSearchResponse(List<String> fileList, Node destinationNode, UUID requestId, int hops) throws IOException {
-        FileSearchResponse fileSearchResponse = new FileSearchResponse(myNode, fileList, requestId, hops, FileSearchResponseStatus.fromCode(fileList.size()));
-
-        LOGGER.info("send search response: \"{}\" to: \"{}\"", fileList.toString(), destinationNode.getId());
-
-        udpMessageSender.sendMessage(fileSearchResponse, destinationNode);
-    }
-
-    @Override
-    public void sendHeartBeatMessage(Node destinationNode) throws IOException {
-        HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
-
         LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
 
-        udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
+        udpMessageSender.sendMessage(nodeAliveGossip, destinationNode);
     }
 
     @Override
-    public Node getDestinationNode(String messageId) {
-        return nodeMap.get(messageId);
+    public Message getSentMessageById(String messageId) {
+        return requestMap.get(messageId);
+    }
+
+    private synchronized void addRequestToQueue(Message message) {
+        requestMap.put(message.getMessageId().toString(), message);
+        requestQueue.add(message.getMessageId().toString());
+    }
+
+    @Override
+    public void startService() {
+        LOGGER.info("message manager started");
+
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                String key = requestQueue.remove();
+                requestMap.remove(key);
+
+                LOGGER.trace("request: \"{}\" cleaned up", key);
+            }
+        }, requestTimeout, requestTimeout, TimeUnit.SECONDS);
+
+        LOGGER.info("request cleanup started");
+    }
+
+    @Override
+    public void stopService() {
+        this.requestMap.clear();
+        this.requestQueue.clear();
+
+        this.scheduledExecutorService.shutdown();
+
+        LOGGER.info("message manager stopped");
     }
 }

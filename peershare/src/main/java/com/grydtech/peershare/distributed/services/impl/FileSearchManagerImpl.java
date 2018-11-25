@@ -4,7 +4,7 @@ import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.search.FileSearchResult;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchReporter;
-import com.grydtech.peershare.distributed.services.MessageSender;
+import com.grydtech.peershare.distributed.services.MessageManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.files.models.FileInfo;
 import com.grydtech.peershare.files.services.FileStore;
@@ -39,15 +39,15 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private final Node myNode;
     private final FileStore fileStore;
     private final ClusterManager clusterManager;
-    private final MessageSender messageSender;
+    private final MessageManager messageManager;
     private final FileSearchReporter fileSearchReporter;
 
     @Autowired
-    public FileSearchManagerImpl(Node myNode, FileStore fileStore, ClusterManager clusterManager, MessageSender messageSender, FileSearchReporter fileSearchReporter) {
+    public FileSearchManagerImpl(Node myNode, FileStore fileStore, ClusterManager clusterManager, MessageManager messageManager, FileSearchReporter fileSearchReporter) {
         this.myNode = myNode;
         this.fileStore = fileStore;
         this.clusterManager = clusterManager;
-        this.messageSender = messageSender;
+        this.messageManager = messageManager;
         this.fileSearchReporter = fileSearchReporter;
     }
 
@@ -74,7 +74,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
         LOGGER.info("send file search request to known nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
-            messageSender.sendFileSearchRequest(keyword, myNode, n, searchId, 1);
+            messageManager.sendFileSearchRequest(keyword, myNode, n, searchId, 1);
         }
 
         return behaviorSubject;
@@ -104,7 +104,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
     public void acceptSearchRequest(UUID searchId, String keyWord, Node startNode, int hop) throws IOException {
         List<String> fileNames = fileStore.search(keyWord).stream().map(FileInfo::getName).collect(Collectors.toList());
 
-        messageSender.sendFileSearchResponse(fileNames, startNode, searchId, hop);
+        messageManager.sendFileSearchResponse(fileNames, startNode, searchId, hop);
 
         fileSearchReporter.searchAccepted();
 
@@ -115,7 +115,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
         LOGGER.info("send file search request to random nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
-            messageSender.sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
+            messageManager.sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
         }
     }
 
@@ -139,7 +139,14 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
     @Override
     public void stopService() {
+        this.resultsMap.forEach((key, value) -> {
+            value.onComplete();
+        });
+
         this.resultsMap.clear();
+        this.searchQueue.clear();
+
+        this.scheduledExecutorService.shutdown();
 
         LOGGER.info("file search manager stopped");
     }
