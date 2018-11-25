@@ -1,4 +1,4 @@
-package com.grydtech.peershare.distributed.models.report;
+package com.grydtech.peershare.report.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -23,13 +23,17 @@ public class FileSearchSummaryReport {
         return minSuccessResponseTime;
     }
 
+    public long getMaxSuccessResponseTime() {
+        return maxSuccessResponseTime;
+    }
+
     public void submitSuccessResponseTime(long time) {
         if (time == -1) return;
 
         minSuccessResponseTime = (minSuccessResponseTime > time) ? time : minSuccessResponseTime;
         maxSuccessResponseTime = (maxSuccessResponseTime < time) ? time : maxSuccessResponseTime;
 
-        averageSuccessResponseTime = (averageSuccessResponseTime * responsesCount + time) / responsesCount + 1;
+        averageSuccessResponseTime = (averageSuccessResponseTime * responsesCount + time) / (responsesCount + 1);
 
         responsesCount++;
     }

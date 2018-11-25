@@ -3,6 +3,7 @@ package com.grydtech.peershare.web.controllers;
 import com.grydtech.peershare.distributed.models.search.FileSearchResult;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
+import com.grydtech.peershare.report.services.Reporter;
 import com.grydtech.peershare.web.models.RoutingTableResponse;
 import com.grydtech.peershare.web.models.SearchRequest;
 import com.grydtech.peershare.web.models.SearchResponse;
@@ -25,12 +26,14 @@ public class WebSocketController {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final FileSearchManager fileSearchManager;
     private final ClusterManager clusterManager;
+    private final Reporter reporter;
 
     @Autowired
-    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager) {
+    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager, Reporter reporter) {
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.fileSearchManager = fileSearchManager;
         this.clusterManager = clusterManager;
+        this.reporter = reporter;
     }
 
     @MessageMapping("/search")
@@ -38,6 +41,8 @@ public class WebSocketController {
         LOGGER.info("file search request received searchText: \"{}\"", searchRequest.getSearchText());
 
         Observable<FileSearchResult> resultObservable = fileSearchManager.submitSearch(UUID.fromString(searchRequest.getSearchId()), searchRequest.getSearchText());
+
+        reporter.reportSearchStarted(UUID.fromString(searchRequest.getSearchId()));
 
         resultObservable.subscribe(fileSearchResult -> fileSearchResult.getFiles().forEach(f -> {
             SearchResult searchResult = new SearchResult(f.getId(), f.getName(), fileSearchResult.getNode().getHost(), fileSearchResult.getNode().getPort());

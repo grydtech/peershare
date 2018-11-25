@@ -9,17 +9,17 @@ import java.util.UUID;
 
 public class PeerJoinResponse extends Message implements SerializableMessage, DeserializableMessage {
 
-    private PeerJoinResponseStatus status;
+    private PeerResponseStatus status;
 
     public PeerJoinResponse() {
     }
 
-    public PeerJoinResponse(PeerJoinResponseStatus status, UUID messageId) {
+    public PeerJoinResponse(PeerResponseStatus status, UUID messageId) {
         this.status = status;
         this.messageId = messageId;
     }
 
-    public PeerJoinResponseStatus getStatus() {
+    public PeerResponseStatus getStatus() {
         return status;
     }
 
@@ -30,7 +30,7 @@ public class PeerJoinResponse extends Message implements SerializableMessage, De
 
         this.messageId = UUID.fromString(parts[1]);
         int code = Integer.parseInt(parts[3]);
-        this.status = PeerJoinResponseStatus.byCode(code);
+        this.status = PeerResponseStatus.byCode(code);
     }
 
     @Override

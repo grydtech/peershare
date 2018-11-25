@@ -1,4 +1,4 @@
-package com.grydtech.peershare.distributed.models.report;
+package com.grydtech.peershare.report.models;
 
 public class NodeReport {
     private int searchesStarted = 0;

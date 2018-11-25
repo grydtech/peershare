@@ -1,17 +1,17 @@
 package com.grydtech.peershare.distributed.models.peer;
 
-public enum PeerJoinResponseStatus {
+public enum PeerResponseStatus {
     SUCCESSFUL(0),
     COMMAND_ERROR(9999),
     UNKNOWN(-1);
 
     private int code;
 
-    PeerJoinResponseStatus(int code) {
+    PeerResponseStatus(int code) {
         this.code = code;
     }
 
-    public static PeerJoinResponseStatus byCode(int code) {
+    public static PeerResponseStatus byCode(int code) {
         switch (code) {
             case 0:
                 return SUCCESSFUL;

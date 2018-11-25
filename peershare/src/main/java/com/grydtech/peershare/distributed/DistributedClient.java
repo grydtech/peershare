@@ -1,7 +1,6 @@
 package com.grydtech.peershare.distributed;
 
 import com.grydtech.peershare.distributed.models.Command;
-import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
@@ -13,7 +12,8 @@ import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
-import com.grydtech.peershare.distributed.services.MessageManager;
+import com.grydtech.peershare.distributed.services.JoinLeaveManager;
+import com.grydtech.peershare.report.services.Reporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,15 +35,17 @@ public class DistributedClient extends Thread {
 
     private final DatagramSocket udpSocket;
     private final ClusterManager clusterManager;
-    private final MessageManager messageManager;
+    private final JoinLeaveManager joinLeaveManager;
     private final FileSearchManager fileSearchManager;
+    private final Reporter reporter;
 
     @Autowired
-    public DistributedClient(DatagramSocket udpSocket, ClusterManager clusterManager, MessageManager messageManager, FileSearchManager fileSearchManager) {
+    public DistributedClient(DatagramSocket udpSocket, ClusterManager clusterManager, JoinLeaveManager joinLeaveManager, FileSearchManager fileSearchManager, Reporter reporter) {
         this.udpSocket = udpSocket;
         this.clusterManager = clusterManager;
-        this.messageManager = messageManager;
+        this.joinLeaveManager = joinLeaveManager;
         this.fileSearchManager = fileSearchManager;
+        this.reporter = reporter;
     }
 
     @Override
@@ -54,6 +56,7 @@ public class DistributedClient extends Thread {
                 clusterManager.unregister();
 
                 clusterManager.stopService();
+                joinLeaveManager.stopService();
                 fileSearchManager.stopService();
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);
@@ -62,6 +65,7 @@ public class DistributedClient extends Thread {
 
         try {
             clusterManager.startService();
+            joinLeaveManager.startService();
             fileSearchManager.startService();
 
             clusterManager.unregister();
@@ -134,7 +138,7 @@ public class DistributedClient extends Thread {
                 handleNodeUnresponsiveGossip(message);
                 break;
             case NODE_ALIVE:
-                handleHeartBeatMessage(message);
+                handleNodeAliveGossip(message);
                 break;
             case UNKNOWN:
                 LOGGER.error("unknown command received");
@@ -149,19 +153,16 @@ public class DistributedClient extends Thread {
         LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNode().getId());
 
         clusterManager.nodeConnected(peerJoinRequest.getNode());
-        messageManager.sendJoinResponse(peerJoinRequest.getNode(), peerJoinRequest.getMessageId());
+        joinLeaveManager.acceptJoinRequest(peerJoinRequest.getMessageId(), peerJoinRequest.getNode());
     }
 
-    private void handleJoinResponse(String message) throws IOException {
+    private void handleJoinResponse(String message) {
         PeerJoinResponse peerJoinResponse = new PeerJoinResponse();
         peerJoinResponse.deserialize(message);
-        PeerJoinRequest peerJoinRequest = (PeerJoinRequest) messageManager.getSentMessageById(peerJoinResponse.getMessageId().toString());
 
-        if (peerJoinRequest != null) {
-            LOGGER.info("join response received from: \"{}\"", peerJoinRequest.getNode().getId());
+        LOGGER.info("join response received");
 
-            clusterManager.nodeConnected(peerJoinRequest.getNode());
-        }
+        joinLeaveManager.submitResponse(peerJoinResponse.getMessageId(), peerJoinResponse.getStatus());
     }
 
     private void handleLeaveRequest(String message) throws IOException {
@@ -171,18 +172,16 @@ public class DistributedClient extends Thread {
         LOGGER.info("leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
 
         clusterManager.nodeDisconnected(peerLeaveRequest.getNode());
-        messageManager.sendLeaveResponse(peerLeaveRequest.getNode(), peerLeaveRequest.getMessageId());
+        joinLeaveManager.acceptLeaveRequest(peerLeaveRequest.getMessageId(), peerLeaveRequest.getNode());
     }
 
     private void handleLeaveResponse(String message) {
         PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse();
         peerLeaveResponse.deserialize(message);
 
-        PeerLeaveRequest peerLeaveRequest = (PeerLeaveRequest) messageManager.getSentMessageById(peerLeaveResponse.getMessageId().toString());
+        LOGGER.info("leave response received");
 
-        if (peerLeaveRequest != null) {
-            LOGGER.info("leave response received from: \"{}\"", peerLeaveRequest.getNode().getId());
-        }
+        joinLeaveManager.submitResponse(peerLeaveResponse.getMessageId(), peerLeaveResponse.getStatus());
     }
 
     private void handleNodeDiscoveredGossip(String message) throws IOException {
@@ -191,7 +190,7 @@ public class DistributedClient extends Thread {
 
         LOGGER.info("node: \"{}\" discovered gossip received", nodeDiscoveredGossip.getDiscoveredNode().getId());
 
-        clusterManager.nodeDiscovered(nodeDiscoveredGossip.getDiscoveredNode(), nodeDiscoveredGossip.getHop() + 1);
+        clusterManager.nodeDiscovered(nodeDiscoveredGossip.getDiscoveredNode(), nodeDiscoveredGossip.getHop());
     }
 
     private void handleNodeUnresponsiveGossip(String message) throws IOException {
@@ -200,16 +199,16 @@ public class DistributedClient extends Thread {
 
         LOGGER.info("node: \"{}\" unresponsive gossip received", nodeUnresponsiveGossip.getUnresponsiveNode().getId());
 
-        clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getHop() + 1);
+        clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getHop());
     }
 
-    private void handleHeartBeatMessage(String message) throws IOException {
+    private void handleNodeAliveGossip(String message) throws IOException {
         NodeAliveGossip nodeAliveGossip = new NodeAliveGossip();
         nodeAliveGossip.deserialize(message);
 
         LOGGER.trace("node: \"{}\" alive gossip received", nodeAliveGossip.getAliveNode().getId());
 
-        clusterManager.nodeAlive(nodeAliveGossip.getAliveNode(), nodeAliveGossip.getHop() + 1);
+        clusterManager.nodeAlive(nodeAliveGossip.getAliveNode(), nodeAliveGossip.getHop());
     }
 
     private void handleFileSearchRequest(String message) throws IOException {
@@ -219,6 +218,8 @@ public class DistributedClient extends Thread {
         LOGGER.info("file search request: \"{}\" received from: \"{}\"", fileSearchRequest.getKeyword(), fileSearchRequest.getNode().getId());
 
         fileSearchManager.acceptSearchRequest(fileSearchRequest.getMessageId(), fileSearchRequest.getKeyword(), fileSearchRequest.getNode(), fileSearchRequest.getHop());
+
+        reporter.reportSearchAccepted(fileSearchRequest.getMessageId(), fileSearchRequest.getHop());
     }
 
     private void handleFileSearchResponse(String message) {
@@ -228,5 +229,7 @@ public class DistributedClient extends Thread {
         LOGGER.info("file search response: \"{}\" received from: \"{}\"", fileSearchResponse.getStatus().toString(), fileSearchResponse.getNode().getId());
 
         fileSearchManager.submitSearchResult(fileSearchResponse.getMessageId(), fileSearchResponse.getFileNames(), fileSearchResponse.getNode(), fileSearchResponse.getHops());
+
+        reporter.reportResultReceived(fileSearchResponse.getMessageId(), fileSearchResponse.getFileNames().size(), fileSearchResponse.getHops(), fileSearchResponse.getNode().getId());
     }
 }

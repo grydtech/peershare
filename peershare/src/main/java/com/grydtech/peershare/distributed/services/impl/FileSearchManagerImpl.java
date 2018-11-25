@@ -1,13 +1,15 @@
 package com.grydtech.peershare.distributed.services.impl;
 
 import com.grydtech.peershare.distributed.models.Node;
+import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
+import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
+import com.grydtech.peershare.distributed.models.search.FileSearchResponseStatus;
 import com.grydtech.peershare.distributed.models.search.FileSearchResult;
 import com.grydtech.peershare.distributed.services.ClusterManager;
-import com.grydtech.peershare.distributed.services.FileSearchReporter;
-import com.grydtech.peershare.distributed.services.MessageManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.files.models.FileInfo;
 import com.grydtech.peershare.files.services.FileStore;
+import com.grydtech.peershare.shared.services.UDPMessageSender;
 import io.reactivex.Observable;
 import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
@@ -18,7 +20,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,16 +44,14 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private final Node myNode;
     private final FileStore fileStore;
     private final ClusterManager clusterManager;
-    private final MessageManager messageManager;
-    private final FileSearchReporter fileSearchReporter;
+    private final UDPMessageSender udpMessageSender;
 
     @Autowired
-    public FileSearchManagerImpl(Node myNode, FileStore fileStore, ClusterManager clusterManager, MessageManager messageManager, FileSearchReporter fileSearchReporter) {
+    public FileSearchManagerImpl(Node myNode, FileStore fileStore, ClusterManager clusterManager, UDPMessageSender udpMessageSender) {
         this.myNode = myNode;
         this.fileStore = fileStore;
         this.clusterManager = clusterManager;
-        this.messageManager = messageManager;
-        this.fileSearchReporter = fileSearchReporter;
+        this.udpMessageSender = udpMessageSender;
     }
 
     @Override
@@ -69,12 +72,10 @@ public class FileSearchManagerImpl implements FileSearchManager {
             resultsMap.put(searchId.toString(), behaviorSubject);
         }
 
-        fileSearchReporter.searchStarted(searchId);
-
         LOGGER.info("send file search request to known nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
-            messageManager.sendFileSearchRequest(keyword, myNode, n, searchId, 1);
+            sendFileSearchRequest(keyword, myNode, n, searchId, 1);
         }
 
         return behaviorSubject;
@@ -96,26 +97,18 @@ public class FileSearchManagerImpl implements FileSearchManager {
                 LOGGER.warn("search already completed");
             }
         }
-
-        fileSearchReporter.resultReceived(searchId, discoveredFiles.size(), hops, node.getId());
     }
 
     @Override
     public void acceptSearchRequest(UUID searchId, String keyWord, Node startNode, int hop) throws IOException {
         List<String> fileNames = fileStore.search(keyWord).stream().map(FileInfo::getName).collect(Collectors.toList());
 
-        messageManager.sendFileSearchResponse(fileNames, startNode, searchId, hop);
-
-        fileSearchReporter.searchAccepted();
-
-        if (!clusterManager.getConnectedCluster().isEmpty() && hop + 1 < searchMaxHops) {
-            fileSearchReporter.searchForwarded();
-        }
+        sendFileSearchResponse(fileNames, startNode, searchId, hop);
 
         LOGGER.info("send file search request to random nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
-            messageManager.sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
+            sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
         }
     }
 
@@ -149,5 +142,29 @@ public class FileSearchManagerImpl implements FileSearchManager {
         this.scheduledExecutorService.shutdown();
 
         LOGGER.info("file search manager stopped");
+    }
+
+    private void sendFileSearchRequest(String keyword, Node startNode, Node destinationNode, UUID requestId, int hop) throws IOException {
+        FileSearchRequest fileSearchRequest = new FileSearchRequest(startNode, keyword, requestId, hop);
+
+        if (startNode.getId().equals(destinationNode.getId())) {
+            LOGGER.warn("cannot send search request to same node");
+            return;
+        } else if (fileSearchRequest.isMaxHopsReached(searchMaxHops + 1)) {
+            LOGGER.warn("search max hop count reached");
+            return;
+        }
+
+        LOGGER.info("send search request: \"{}\" to: \"{}\"", keyword, destinationNode.getId());
+
+        udpMessageSender.sendMessage(fileSearchRequest, destinationNode);
+    }
+
+    private void sendFileSearchResponse(List<String> fileList, Node destinationNode, UUID requestId, int hops) throws IOException {
+        FileSearchResponse fileSearchResponse = new FileSearchResponse(myNode, fileList, requestId, hops, FileSearchResponseStatus.fromCode(fileList.size()));
+
+        LOGGER.info("send search response: \"{}\" to: \"{}\"", fileList.toString(), destinationNode.getId());
+
+        udpMessageSender.sendMessage(fileSearchResponse, destinationNode);
     }
 }

@@ -1,4 +1,4 @@
-package com.grydtech.peershare.distributed.models.report;
+package com.grydtech.peershare.report.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
