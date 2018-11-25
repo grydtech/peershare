@@ -1,6 +1,7 @@
 package com.grydtech.peershare.distributed.services.impl;
 
 import com.grydtech.peershare.distributed.models.report.FileSearchReport;
+import com.grydtech.peershare.distributed.models.report.FileSearchSummaryReport;
 import com.grydtech.peershare.distributed.models.report.NodeReport;
 import com.grydtech.peershare.distributed.services.FileSearchReporter;
 import org.springframework.stereotype.Service;
@@ -21,17 +22,17 @@ public class FileSearchReporterImpl implements FileSearchReporter {
     }
 
     @Override
-    public void searchAccepted() {
+    public synchronized void searchAccepted() {
         nodeReport.searchAccepted();
     }
 
     @Override
-    public void searchForwarded() {
+    public synchronized void searchForwarded() {
         nodeReport.searchForwarded();
     }
 
     @Override
-    public void resultReceived(UUID searchId, int fileCount, int hops, String nodeId) {
+    public synchronized void resultReceived(UUID searchId, int fileCount, int hops, String nodeId) {
         nodeReport.responseReceived();
 
         FileSearchReport fileSearchReport = searchReportMap.get(searchId.toString());
@@ -49,5 +50,12 @@ public class FileSearchReporterImpl implements FileSearchReporter {
     @Override
     public Collection<FileSearchReport> getFileSearchReports() {
         return searchReportMap.values();
+    }
+
+    @Override
+    public synchronized FileSearchSummaryReport getFileSearchSummary() {
+        FileSearchSummaryReport fileSearchSummaryReport = new FileSearchSummaryReport();
+        searchReportMap.values().forEach(r -> fileSearchSummaryReport.submitSuccessResponseTime(r.getSuccessResponseTime()));
+        return fileSearchSummaryReport;
     }
 }

@@ -108,7 +108,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         fileSearchReporter.searchAccepted();
 
-        if (hop + 1 >= searchMaxHops) {
+        if (!clusterManager.getConnectedCluster().isEmpty() && hop + 1 < searchMaxHops) {
             fileSearchReporter.searchForwarded();
         }
 

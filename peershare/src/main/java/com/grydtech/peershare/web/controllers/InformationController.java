@@ -1,6 +1,7 @@
 package com.grydtech.peershare.web.controllers;
 
 import com.grydtech.peershare.distributed.models.Node;
+import com.grydtech.peershare.distributed.models.report.FileSearchSummaryReport;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.files.models.FileInfo;
 import com.grydtech.peershare.files.services.FileStore;
@@ -66,5 +67,12 @@ public class InformationController {
         LOGGER.info("get search report request received");
 
         return ResponseEntity.ok(fileSearchReporter.getFileSearchReports());
+    }
+
+    @GetMapping("search-summary")
+    public ResponseEntity<FileSearchSummaryReport> getSearchSummary() {
+        LOGGER.info("get search summary request received");
+
+        return ResponseEntity.ok(fileSearchReporter.getFileSearchSummary());
     }
 }

@@ -1,6 +1,7 @@
 package com.grydtech.peershare.distributed.services;
 
 import com.grydtech.peershare.distributed.models.report.FileSearchReport;
+import com.grydtech.peershare.distributed.models.report.FileSearchSummaryReport;
 import com.grydtech.peershare.distributed.models.report.NodeReport;
 
 import java.util.Collection;
@@ -19,4 +20,6 @@ public interface FileSearchReporter {
     NodeReport getNodeReport();
 
     Collection<FileSearchReport> getFileSearchReports();
+
+    FileSearchSummaryReport getFileSearchSummary();
 }
