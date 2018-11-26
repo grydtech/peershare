@@ -96,6 +96,8 @@ public class ClusterManagerImpl implements ClusterManager {
         this.clientState = ClientState.IDLE;
 
         this.bootstrapNodes.clear();
+
+        LOGGER.info("bootstrap nodes available: \"{}\"", registerResponse.getNodes().size());
         this.bootstrapNodes.addAll(registerResponse.getNodes());
     }
 
