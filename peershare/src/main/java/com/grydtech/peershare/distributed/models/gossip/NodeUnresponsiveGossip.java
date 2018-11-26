@@ -11,14 +11,16 @@ import java.util.UUID;
 public class NodeUnresponsiveGossip extends Message implements SerializableMessage, DeserializableMessage {
 
     private Node unresponsiveNode;
+    private Node sourceNode;
 
     private int hop;
 
     public NodeUnresponsiveGossip() {
     }
 
-    public NodeUnresponsiveGossip(Node unresponsiveNode, int hop) {
+    public NodeUnresponsiveGossip(Node unresponsiveNode, Node sourceNode, int hop) {
         this.unresponsiveNode = unresponsiveNode;
+        this.sourceNode = sourceNode;
         this.hop = hop;
 
         this.messageId = UUID.randomUUID();
@@ -26,6 +28,10 @@ public class NodeUnresponsiveGossip extends Message implements SerializableMessa
 
     public Node getUnresponsiveNode() {
         return unresponsiveNode;
+    }
+
+    public Node getSourceNode() {
+        return sourceNode;
     }
 
     public int getHop() {
@@ -43,12 +49,15 @@ public class NodeUnresponsiveGossip extends Message implements SerializableMessa
 
         this.messageId = UUID.fromString(parts[1]);
         this.hop = Integer.parseInt(parts[3]);
-        this.unresponsiveNode = new Node(parts[4], Integer.parseInt(parts[5]));
+        this.sourceNode = new Node(parts[4], Integer.parseInt(parts[5]));
+        this.unresponsiveNode = new Node(parts[6], Integer.parseInt(parts[7]));
     }
 
     @Override
     public String serialize() {
-        String s = String.format("%s %s %d %s %d", this.messageId.toString(), Command.NODE_UNRESPONSIVE.toString(), this.hop, this.unresponsiveNode.getHost(), this.unresponsiveNode.getPort());
+        String s = String.format("%s %s %d %s %d %s %d", this.messageId.toString(), Command.NODE_UNRESPONSIVE.toString(),
+                this.hop, this.sourceNode.getHost(), this.sourceNode.getPort(), this.unresponsiveNode.getHost(),
+                this.unresponsiveNode.getPort());
         return String.format("%04d %s", s.length() + 5, s);
     }
 }

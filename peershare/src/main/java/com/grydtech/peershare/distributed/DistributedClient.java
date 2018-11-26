@@ -1,7 +1,7 @@
 package com.grydtech.peershare.distributed;
 
 import com.grydtech.peershare.distributed.models.Command;
-import com.grydtech.peershare.distributed.models.gossip.NodeAliveGossip;
+import com.grydtech.peershare.distributed.models.heartbeat.HeartBeatMessage;
 import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
 import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinRequest;
@@ -106,7 +106,7 @@ public class DistributedClient {
             case NODE_UNRESPONSIVE:
                 handleNodeUnresponsiveGossip(message);
                 break;
-            case NODE_ALIVE:
+            case HEART_BEAT:
                 handleNodeAliveGossip(message);
                 break;
             case UNKNOWN:
@@ -168,16 +168,16 @@ public class DistributedClient {
 
         LOGGER.info("node: \"{}\" unresponsive gossip received", nodeUnresponsiveGossip.getUnresponsiveNode().getId());
 
-        clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getHop());
+        clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getSourceNode(), nodeUnresponsiveGossip.getHop());
     }
 
     private void handleNodeAliveGossip(String message) throws IOException {
-        NodeAliveGossip nodeAliveGossip = new NodeAliveGossip();
-        nodeAliveGossip.deserialize(message);
+        HeartBeatMessage heartBeatMessage = new HeartBeatMessage();
+        heartBeatMessage.deserialize(message);
 
-        LOGGER.trace("node: \"{}\" alive gossip received", nodeAliveGossip.getAliveNode().getId());
+        LOGGER.trace("node: \"{}\" alive gossip received", heartBeatMessage.getNode().getId());
 
-        clusterManager.nodeAlive(nodeAliveGossip.getAliveNode(), nodeAliveGossip.getHop());
+        clusterManager.nodeAlive(heartBeatMessage.getNode(), heartBeatMessage.getHop());
     }
 
     private void handleFileSearchRequest(String message) throws IOException {

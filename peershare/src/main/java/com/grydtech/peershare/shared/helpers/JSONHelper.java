@@ -23,6 +23,6 @@ public final class JSONHelper {
             LOGGER.error(e.getMessage(), e);
         }
 
-        return "error occurred when serialing object to json";
+        return "error occurred when serializing object to json";
     }
 }

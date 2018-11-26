@@ -13,7 +13,7 @@ public enum Command {
     SEARCH_OK("SEROK"),
     NODE_DISCOVERED("GOSDIS"),
     NODE_UNRESPONSIVE("GOSUNR"),
-    NODE_ALIVE("GOSALI"),
+    HEART_BEAT("HEARTBEAT"),
     UNKNOWN("UNKNOWN");
 
     private String message;
@@ -52,8 +52,8 @@ public enum Command {
             return Command.NODE_DISCOVERED;
         } else if ("GOSUNR".equals(string)) {
             return Command.NODE_UNRESPONSIVE;
-        } else if ("GOSALI".equals(string)) {
-            return Command.NODE_ALIVE;
+        } else if ("HEARTBEAT".equals(string)) {
+            return Command.HEART_BEAT;
         } else {
             return Command.UNKNOWN;
         }
