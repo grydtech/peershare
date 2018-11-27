@@ -8,12 +8,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.SocketException;
-import java.net.URL;
 import java.util.Objects;
 
 @Configuration
@@ -34,12 +32,10 @@ public class BeanConfiguration {
         int serverPort = Integer.parseInt(Objects.requireNonNull(environment.getProperty("server.port")));
 
         if (serverHost == null || serverHost.equals("")) {
-            LOGGER.info("server host not found retrieve host name via \"http://checkip.amazonaws.com\"");
+            LOGGER.info("server host not found retrieving host");
 
-            URL whatismyip = new URL("http://checkip.amazonaws.com");
-            BufferedReader in = new BufferedReader(new InputStreamReader(whatismyip.openStream()));
-
-            serverHost = in.readLine();
+            InetAddress localhost = InetAddress.getLocalHost();
+            serverHost = localhost.getHostAddress().trim();
 
             LOGGER.info("server host retrieved: \"{}\"", serverHost);
         }

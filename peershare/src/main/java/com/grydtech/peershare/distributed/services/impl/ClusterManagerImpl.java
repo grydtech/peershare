@@ -47,15 +47,17 @@ public class ClusterManagerImpl implements ClusterManager {
     private int nodeHeartBeatInterval;
     @Value("${join.timeout}")
     private int joinTimeout;
-    @Value("${server.name}")
-    private String serviceName;
+    @Value("${gossip.interval}")
+    private int gossipInterval;
+    @Value("${username}")
+    private String username;
+
     private final JoinLeaveManager joinLeaveManager;
     private final TCPMessageSender tcpMessageSender;
     private final UDPMessageSender udpMessageSender;
     private final Node myNode;
     private final Node bootstrapNode;
-    @Value("${gossip.interval}")
-    private int gossipInterval;
+
     private ClientState clientState = ClientState.DISCONNECTED;
 
     @Autowired
@@ -217,7 +219,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     private RegisterResponse sendRegisterRequest() throws IOException {
-        RegisterRequest registerRequest = new RegisterRequest(myNode, serviceName);
+        RegisterRequest registerRequest = new RegisterRequest(myNode, username);
 
         LOGGER.info("send register request");
 
@@ -232,7 +234,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     private UnregisterResponse sendUnregisterRequest() throws IOException {
-        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, serviceName);
+        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, username);
 
         LOGGER.info("send unregister request");
 
