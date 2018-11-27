@@ -11,8 +11,7 @@ public enum Command {
     LEAVE_OK("LEAVEOK"),
     SEARCH("SER"),
     SEARCH_OK("SEROK"),
-    NODE_DISCOVERED("GOSDIS"),
-    NODE_UNRESPONSIVE("GOSUNR"),
+    GOSSIP("GOSSIP"),
     HEART_BEAT("HEARTBEAT"),
     UNKNOWN("UNKNOWN");
 
@@ -48,10 +47,8 @@ public enum Command {
             return Command.SEARCH;
         } else if ("SEROK".equals(string)) {
             return Command.SEARCH_OK;
-        } else if ("GOSDIS".equals(string)) {
-            return Command.NODE_DISCOVERED;
-        } else if ("GOSUNR".equals(string)) {
-            return Command.NODE_UNRESPONSIVE;
+        } else if ("GOSSIP".equals(string)) {
+            return Command.GOSSIP;
         } else if ("HEARTBEAT".equals(string)) {
             return Command.HEART_BEAT;
         } else {

@@ -1,9 +1,8 @@
 package com.grydtech.peershare.distributed;
 
 import com.grydtech.peershare.distributed.models.Command;
+import com.grydtech.peershare.distributed.models.gossip.GossipMessage;
 import com.grydtech.peershare.distributed.models.heartbeat.HeartBeatMessage;
-import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
-import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinRequest;
 import com.grydtech.peershare.distributed.models.peer.PeerJoinResponse;
 import com.grydtech.peershare.distributed.models.peer.PeerLeaveRequest;
@@ -100,14 +99,11 @@ public class DistributedClient {
             case SEARCH_OK:
                 handleFileSearchResponse(message);
                 break;
-            case NODE_DISCOVERED:
+            case GOSSIP:
                 handleNodeDiscoveredGossip(message);
                 break;
-            case NODE_UNRESPONSIVE:
-                handleNodeUnresponsiveGossip(message);
-                break;
             case HEART_BEAT:
-                handleNodeAliveGossip(message);
+                handleNodeHeartBeatMessage(message);
                 break;
             case UNKNOWN:
                 LOGGER.error("unknown command received");
@@ -154,30 +150,21 @@ public class DistributedClient {
     }
 
     private void handleNodeDiscoveredGossip(String message) throws IOException {
-        NodeDiscoveredGossip nodeDiscoveredGossip = new NodeDiscoveredGossip();
-        nodeDiscoveredGossip.deserialize(message);
+        GossipMessage gossipMessage = new GossipMessage();
+        gossipMessage.deserialize(message);
 
-        LOGGER.info("node: \"{}\" discovered gossip received", nodeDiscoveredGossip.getDiscoveredNode().getId());
+        LOGGER.info("node: \"{}\" discovered gossip received", gossipMessage.getDiscoveredNode().getId());
 
-        clusterManager.nodeDiscovered(nodeDiscoveredGossip.getDiscoveredNode(), nodeDiscoveredGossip.getHop());
+        clusterManager.nodeDiscovered(gossipMessage.getDiscoveredNode());
     }
 
-    private void handleNodeUnresponsiveGossip(String message) throws IOException {
-        NodeUnresponsiveGossip nodeUnresponsiveGossip = new NodeUnresponsiveGossip();
-        nodeUnresponsiveGossip.deserialize(message);
-
-        LOGGER.info("node: \"{}\" unresponsive gossip received", nodeUnresponsiveGossip.getUnresponsiveNode().getId());
-
-        clusterManager.nodeUnresponsive(nodeUnresponsiveGossip.getUnresponsiveNode(), nodeUnresponsiveGossip.getSourceNode(), nodeUnresponsiveGossip.getHop());
-    }
-
-    private void handleNodeAliveGossip(String message) throws IOException {
+    private void handleNodeHeartBeatMessage(String message) throws IOException {
         HeartBeatMessage heartBeatMessage = new HeartBeatMessage();
         heartBeatMessage.deserialize(message);
 
         LOGGER.trace("node: \"{}\" alive gossip received", heartBeatMessage.getNode().getId());
 
-        clusterManager.nodeAlive(heartBeatMessage.getNode(), heartBeatMessage.getHop());
+        clusterManager.nodeReset(heartBeatMessage.getNode());
     }
 
     private void handleFileSearchRequest(String message) throws IOException {

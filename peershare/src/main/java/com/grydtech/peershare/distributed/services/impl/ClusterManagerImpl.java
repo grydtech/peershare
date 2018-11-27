@@ -5,12 +5,8 @@ import com.grydtech.peershare.distributed.exceptions.IllegalCommandException;
 import com.grydtech.peershare.distributed.helpers.NodeHelper;
 import com.grydtech.peershare.distributed.models.ClientState;
 import com.grydtech.peershare.distributed.models.Node;
-import com.grydtech.peershare.distributed.models.bootstrap.RegisterRequest;
-import com.grydtech.peershare.distributed.models.bootstrap.RegisterResponse;
-import com.grydtech.peershare.distributed.models.bootstrap.UnregisterRequest;
-import com.grydtech.peershare.distributed.models.bootstrap.UnregisterResponse;
-import com.grydtech.peershare.distributed.models.gossip.NodeDiscoveredGossip;
-import com.grydtech.peershare.distributed.models.gossip.NodeUnresponsiveGossip;
+import com.grydtech.peershare.distributed.models.bootstrap.*;
+import com.grydtech.peershare.distributed.models.gossip.GossipMessage;
 import com.grydtech.peershare.distributed.models.heartbeat.HeartBeatMessage;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.JoinLeaveManager;
@@ -44,12 +40,7 @@ public class ClusterManagerImpl implements ClusterManager {
     private final List<Node> bootstrapNodes = new ArrayList<>();
     private final List<Node> knownNodes = new ArrayList<>();
     private final BehaviorSubject<List<Node>> knownNodesBehaviourSubject = BehaviorSubject.create();
-    private final JoinLeaveManager joinLeaveManager;
-    private final TCPMessageSender tcpMessageSender;
-    private final UDPMessageSender udpMessageSender;
-    private final Node myNode;
-    private final Node bootstrapNode;
-    private ClientState clientState = ClientState.DISCONNECTED;
+
     @Value("${node.ttl}")
     private int nodeTTL;
     @Value("${node.heartbeat-interval}")
@@ -58,8 +49,14 @@ public class ClusterManagerImpl implements ClusterManager {
     private int joinTimeout;
     @Value("${server.name}")
     private String serviceName;
-    @Value("${gossip.max-hops}")
-    private int gossipMaxHops;
+    private final JoinLeaveManager joinLeaveManager;
+    private final TCPMessageSender tcpMessageSender;
+    private final UDPMessageSender udpMessageSender;
+    private final Node myNode;
+    private final Node bootstrapNode;
+    @Value("${gossip.interval}")
+    private int gossipInterval;
+    private ClientState clientState = ClientState.DISCONNECTED;
 
     @Autowired
     public ClusterManagerImpl(JoinLeaveManager joinLeaveManager, Node myNode, TCPMessageSender tcpMessageSender, UDPMessageSender udpMessageSender, Node bootstrapNode) {
@@ -102,10 +99,12 @@ public class ClusterManagerImpl implements ClusterManager {
 
         UnregisterResponse unregisterResponse = sendUnregisterRequest();
 
-        this.clientState = ClientState.UNREGISTERED;
-        LOGGER.info("node unregistered with bootstrap server");
+        if (unregisterResponse.getStatus() == BootstrapResponseStatus.SUCCESSFUL) {
+            this.clientState = ClientState.UNREGISTERED;
+            LOGGER.info("node unregistered with bootstrap server");
 
-        this.bootstrapNodes.clear();
+            this.bootstrapNodes.clear();
+        }
     }
 
     @Override
@@ -137,7 +136,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public synchronized void nodeConnected(Node connectedNode) throws IOException {
+    public synchronized void nodeConnected(Node connectedNode) {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(connectedNode.getId())).findFirst();
 
         if (!node.isPresent()) {
@@ -146,12 +145,6 @@ public class ClusterManagerImpl implements ClusterManager {
             this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
             LOGGER.info("connected node: \"{}\" added to cluster", connectedNode.getId());
-
-            for (Node n : this.knownNodes) {
-                if (!n.getId().equals(connectedNode.getId())) {
-                    sendNodeDiscoveredGossip(connectedNode, n, 1);
-                }
-            }
         } else {
             node.get().resetTTL();
             LOGGER.warn("node: \"{}\" already connected", connectedNode.getId());
@@ -167,7 +160,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     @Override
-    public synchronized void nodeDiscovered(Node discoveredNode, int hop) throws IOException {
+    public synchronized void nodeDiscovered(Node discoveredNode) throws IOException {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(discoveredNode.getId())).findFirst();
 
         if (!node.isPresent()) {
@@ -176,30 +169,11 @@ public class ClusterManagerImpl implements ClusterManager {
             joinLeaveManager.submitJoinRequest(discoveredNode).subscribe(status -> {
                 if (status) nodeConnected(discoveredNode);
             });
-
-            LOGGER.info("select random nodes to send node discovered gossip");
-
-            for (Node n : NodeHelper.getRandomNodes(this.knownNodes)) {
-                sendNodeDiscoveredGossip(discoveredNode, n, hop + 1);
-            }
         }
     }
 
     @Override
-    public synchronized void nodeUnresponsive(Node unresponsiveNode, Node sourceNode, int hop) throws IOException {
-        Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(unresponsiveNode.getId())).findFirst();
-
-        if (node.isPresent()) {
-            LOGGER.info("send node: \"{}\" discovered gossip to source node: \"{}\"", unresponsiveNode.getId(), sourceNode.getId());
-
-            sendNodeUnresponsiveGossip(unresponsiveNode, sourceNode, hop + 1);
-        } else {
-            LOGGER.warn("unresponsive node: \"{}\" already removed from cluster", unresponsiveNode.getId());
-        }
-    }
-
-    @Override
-    public synchronized void nodeAlive(Node aliveNode, int hop) throws IOException {
+    public synchronized void nodeReset(Node aliveNode) throws IOException {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(aliveNode.getId())).findFirst();
 
         if (node.isPresent()) {
@@ -229,87 +203,10 @@ public class ClusterManagerImpl implements ClusterManager {
     public void startService() {
         LOGGER.info("distributed manager started");
 
-        this.joinExecutor.scheduleAtFixedRate(() -> {
-            synchronized (this) {
-                if (clientState == ClientState.IDLE && !bootstrapNodes.isEmpty() && knownNodes.isEmpty()) {
-                    LOGGER.warn("node is idle, retry join");
-
-                    for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
-                        try {
-                            this.joinLeaveManager.submitJoinRequest(n).subscribe(status -> {
-                                if (status) nodeConnected(n);
-                            });
-                        } catch (IOException e) {
-                            LOGGER.error(e.getMessage(), e);
-                        }
-                    }
-                } else {
-                    LOGGER.info("join with cluster completed, shutting down join retry manager");
-
-                    this.joinExecutor.shutdown();
-                }
-            }
-        }, joinTimeout, joinTimeout, TimeUnit.SECONDS);
-
-        LOGGER.info("join retry manager started");
-
-        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
-            synchronized (this) {
-                this.knownNodes.forEach(n -> {
-                    try {
-                        sendHeartBeatMessage(myNode, n, 1);
-                    } catch (IOException e) {
-                        LOGGER.error(e.getMessage(), e);
-                    }
-                });
-            }
-        }, 0, nodeHeartBeatInterval, TimeUnit.SECONDS);
-
-        LOGGER.info("node alive gossip sender started");
-
-        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
-            synchronized (this) {
-                this.knownNodes.forEach(Node::reduceTTL);
-
-                LOGGER.trace("node ttl cycle completed");
-            }
-        }, 1, 1, TimeUnit.SECONDS);
-
-        LOGGER.info("node ttl reducer started");
-
-        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
-            synchronized (this) {
-                List<Node> unresponsiveNodes = this.knownNodes.stream().filter(Node::isTTLExpired)
-                        .collect(Collectors.toList());
-                this.knownNodes.removeAll(unresponsiveNodes);
-
-                if (!unresponsiveNodes.isEmpty()) {
-                    this.knownNodesBehaviourSubject.onNext(this.knownNodes);
-                }
-
-                unresponsiveNodes.forEach(un -> {
-                    try {
-                        this.joinLeaveManager.submitJoinRequest(un).subscribe(status -> {
-                            if (status) nodeConnected(un);
-                        });
-                    } catch (IOException e) {
-                        LOGGER.error(e.getMessage(), e);
-                    }
-
-                    this.knownNodes.forEach(n -> {
-                        try {
-                            sendNodeUnresponsiveGossip(un, n, 1);
-                        } catch (IOException e) {
-                            LOGGER.error(e.getMessage(), e);
-                        }
-                    });
-                });
-
-                LOGGER.trace("node ttl scanned");
-            }
-        }, nodeTTL, nodeTTL, TimeUnit.SECONDS);
-
-        LOGGER.info("node ttl scanner started");
+        startJoinRetry();
+        startTTLScanner();
+        startHeartBeatSender();
+        startGossipSender();
     }
 
     @Override
@@ -349,48 +246,122 @@ public class ClusterManagerImpl implements ClusterManager {
         return unregisterResponse;
     }
 
-    private void sendNodeDiscoveredGossip(Node discoveredNode, Node destinationNode, int hop) throws IOException {
-        NodeDiscoveredGossip nodeDiscoveredGossip = new NodeDiscoveredGossip(discoveredNode, hop);
+    private void sendNodeDiscoveredGossip(Node discoveredNode, Node destinationNode) throws IOException {
+        GossipMessage gossipMessage = new GossipMessage(discoveredNode);
 
         if (discoveredNode.getId().equals(destinationNode.getId())) {
             LOGGER.warn("cannot send node: \"{}\" discovered gossip to same node: \"{}\"", discoveredNode.getId(), destinationNode.getId());
-            return;
-        } else if (nodeDiscoveredGossip.isMaxHopsReached(gossipMaxHops + 1)) {
-            LOGGER.warn("gossip max hop count reached");
             return;
         }
 
         LOGGER.info("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
 
-        udpMessageSender.sendMessage(nodeDiscoveredGossip, destinationNode);
+        udpMessageSender.sendMessage(gossipMessage, destinationNode);
     }
 
-    private void sendNodeUnresponsiveGossip(Node unresponsiveNode, Node destinationNode, int hop) throws IOException {
-        NodeUnresponsiveGossip nodeUnresponsiveGossip = new NodeUnresponsiveGossip(unresponsiveNode, myNode, hop);
+    private void sendHeartBeatMessage(Node destinationNode) throws IOException {
+        HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
 
-        if (unresponsiveNode.getId().equals(destinationNode.getId())) {
-            LOGGER.warn("cannot send node: \"{}\" unresponsive gossip to same node: \"{}\"", unresponsiveNode.getId(), destinationNode.getId());
-            return;
-        } else if (nodeUnresponsiveGossip.isMaxHopsReached(gossipMaxHops + 1)) {
-            LOGGER.warn("gossip max hop count reached");
-            return;
-        }
-
-        LOGGER.info("send node: \"{}\" unresponsive gossip to: \"{}\"", unresponsiveNode.getId(), destinationNode.getId());
-
-        udpMessageSender.sendMessage(nodeUnresponsiveGossip, destinationNode);
+        LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
+        udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
     }
 
-    private void sendHeartBeatMessage(Node aliveNode, Node destinationNode, int hop) throws IOException {
-        HeartBeatMessage heartBeatMessage = new HeartBeatMessage(aliveNode, hop);
+    private void startJoinRetry() {
+        this.joinExecutor.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                if (clientState == ClientState.IDLE && !bootstrapNodes.isEmpty() && knownNodes.isEmpty()) {
+                    LOGGER.warn("node is idle, retry join");
 
-        if (aliveNode.getId().equals(destinationNode.getId())) {
-            LOGGER.trace("cannot send node: \"{}\" node alive gossip to same node: \"{}\"", aliveNode.getId(), destinationNode.getId());
-        } else if (heartBeatMessage.isMaxHopsReached(gossipMaxHops + 1)) {
-            LOGGER.trace("gossip max hop count reached");
-        } else {
-            LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
-            udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
-        }
+                    for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
+                        try {
+                            this.joinLeaveManager.submitJoinRequest(n).subscribe(status -> {
+                                if (status) nodeConnected(n);
+                            });
+                        } catch (IOException e) {
+                            LOGGER.error(e.getMessage(), e);
+                        }
+                    }
+                } else {
+                    LOGGER.info("join with cluster completed, shutting down join retry manager");
+
+                    this.joinExecutor.shutdown();
+                }
+            }
+        }, joinTimeout, joinTimeout, TimeUnit.SECONDS);
+
+        LOGGER.info("join retry manager started");
+    }
+
+    private void startTTLScanner() {
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                this.knownNodes.forEach(Node::reduceTTL);
+
+                LOGGER.trace("node ttl cycle completed");
+            }
+        }, 1, 1, TimeUnit.SECONDS);
+
+        LOGGER.info("node ttl reducer started");
+
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                List<Node> unresponsiveNodes = this.knownNodes.stream().filter(Node::isTTLExpired)
+                        .collect(Collectors.toList());
+                this.knownNodes.removeAll(unresponsiveNodes);
+
+                if (!unresponsiveNodes.isEmpty()) {
+                    this.knownNodesBehaviourSubject.onNext(this.knownNodes);
+                }
+
+                unresponsiveNodes.forEach(un -> {
+                    try {
+                        this.joinLeaveManager.submitJoinRequest(un).subscribe(status -> {
+                            if (status) nodeConnected(un);
+                        });
+                    } catch (IOException e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
+                });
+
+                LOGGER.trace("node ttl scanned");
+            }
+        }, nodeTTL, nodeTTL, TimeUnit.SECONDS);
+
+        LOGGER.info("node ttl scanner started");
+    }
+
+    private void startHeartBeatSender() {
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                this.knownNodes.forEach(n -> {
+                    try {
+                        sendHeartBeatMessage(n);
+                    } catch (IOException e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
+                });
+            }
+        }, 0, nodeHeartBeatInterval, TimeUnit.SECONDS);
+
+        LOGGER.info("node alive gossip sender started");
+    }
+
+    private void startGossipSender() {
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            List<Node> discoveredNodes = NodeHelper.getRandomNodes(knownNodes);
+            List<Node> destinationNodea = NodeHelper.getRandomNodes(knownNodes);
+
+            for (Node dn : discoveredNodes) {
+                for (Node n : destinationNodea) {
+                    try {
+                        sendNodeDiscoveredGossip(dn, n);
+                    } catch (IOException e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
+                }
+            }
+        }, gossipInterval, gossipInterval, TimeUnit.SECONDS);
+
+        LOGGER.info("gossip sender started");
     }
 }

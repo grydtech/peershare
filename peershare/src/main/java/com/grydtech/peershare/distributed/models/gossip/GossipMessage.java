@@ -8,17 +8,15 @@ import com.grydtech.peershare.shared.models.SerializableMessage;
 
 import java.util.UUID;
 
-public class NodeDiscoveredGossip extends Message implements SerializableMessage, DeserializableMessage {
+public class GossipMessage extends Message implements SerializableMessage, DeserializableMessage {
 
     private Node discoveredNode;
-    private int hop;
 
-    public NodeDiscoveredGossip() {
+    public GossipMessage() {
     }
 
-    public NodeDiscoveredGossip(Node discoveredNode, int hop) {
+    public GossipMessage(Node discoveredNode) {
         this.discoveredNode = discoveredNode;
-        this.hop = hop;
 
         this.messageId = UUID.randomUUID();
     }
@@ -27,27 +25,18 @@ public class NodeDiscoveredGossip extends Message implements SerializableMessage
         return discoveredNode;
     }
 
-    public int getHop() {
-        return hop;
-    }
-
-    public boolean isMaxHopsReached(int maxHops) {
-        return hop > maxHops;
-    }
-
     @Override
     public void deserialize(String message) {
         String[] parts = message.split(" ");
-        if (!Command.NODE_DISCOVERED.toString().equals(parts[2])) return;
+        if (!Command.GOSSIP.toString().equals(parts[2])) return;
 
         this.messageId = UUID.fromString(parts[1]);
-        this.hop = Integer.parseInt(parts[3]);
-        this.discoveredNode = new Node(parts[4], Integer.parseInt(parts[5]));
+        this.discoveredNode = new Node(parts[3], Integer.parseInt(parts[4]));
     }
 
     @Override
     public String serialize() {
-        String s = String.format("%s %s %d %s %d", this.messageId.toString(), Command.NODE_DISCOVERED.toString(), this.hop, this.discoveredNode.getHost(), this.discoveredNode.getPort());
+        String s = String.format("%s %s %s %d", this.messageId.toString(), Command.GOSSIP.toString(), this.discoveredNode.getHost(), this.discoveredNode.getPort());
         return String.format("%04d %s", s.length() + 5, s);
     }
 }

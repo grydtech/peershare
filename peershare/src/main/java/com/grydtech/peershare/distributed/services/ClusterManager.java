@@ -23,11 +23,9 @@ public interface ClusterManager extends Manager {
 
     void nodeDisconnected(Node disconnectedNode);
 
-    void nodeDiscovered(Node discoveredNode, int hop) throws IOException;
+    void nodeDiscovered(Node discoveredNode) throws IOException;
 
-    void nodeUnresponsive(Node unresponsiveNode, Node sourceNode, int hop) throws IOException;
-
-    void nodeAlive(Node aliveNode, int hop) throws IOException;
+    void nodeReset(Node aliveNode) throws IOException;
 
     Observable<List<Node>> getConnectedClusterObservable();
 
