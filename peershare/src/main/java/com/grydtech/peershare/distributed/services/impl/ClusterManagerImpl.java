@@ -8,6 +8,9 @@ import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.bootstrap.*;
 import com.grydtech.peershare.distributed.models.gossip.GossipMessage;
 import com.grydtech.peershare.distributed.models.heartbeat.HeartBeatMessage;
+import com.grydtech.peershare.distributed.models.peer.PeerJoinRequest;
+import com.grydtech.peershare.distributed.models.peer.PeerLeaveRequest;
+import com.grydtech.peershare.distributed.models.peer.PeerResponseStatus;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.JoinLeaveManager;
 import com.grydtech.peershare.shared.services.TCPMessageSender;
@@ -116,18 +119,14 @@ public class ClusterManagerImpl implements ClusterManager {
         }
 
         for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
-            this.joinLeaveManager.submitJoinRequest(n).subscribe(status -> {
-                if (status) nodeConnected(n);
-            });
+            this.submitJoinRequest(n);
         }
     }
 
     @Override
     public synchronized void leave() throws IOException {
         for (Node n : this.knownNodes) {
-            this.joinLeaveManager.submitLeaveRequest(n).subscribe(status -> {
-                if (status) nodeDisconnected(n);
-            });
+            this.submitLeaveRequest(n);
         }
         this.knownNodes.clear();
         this.knownNodesBehaviourSubject.onNext(this.knownNodes);
@@ -168,9 +167,7 @@ public class ClusterManagerImpl implements ClusterManager {
         if (!node.isPresent()) {
             LOGGER.info("send join request to: \"{}\"", discoveredNode.getId());
 
-            joinLeaveManager.submitJoinRequest(discoveredNode).subscribe(status -> {
-                if (status) nodeConnected(discoveredNode);
-            });
+            this.submitJoinRequest(discoveredNode);
         }
     }
 
@@ -185,9 +182,7 @@ public class ClusterManagerImpl implements ClusterManager {
         } else {
             LOGGER.warn("node disconnected, retrying connection");
 
-            this.joinLeaveManager.submitJoinRequest(aliveNode).subscribe(status -> {
-                if (status) nodeConnected(aliveNode);
-            });
+            this.submitJoinRequest(aliveNode);
         }
     }
 
@@ -218,56 +213,6 @@ public class ClusterManagerImpl implements ClusterManager {
         LOGGER.info("distributed manager stopped");
     }
 
-    private RegisterResponse sendRegisterRequest() throws IOException {
-        RegisterRequest registerRequest = new RegisterRequest(myNode, username);
-
-        LOGGER.info("send register request");
-
-        String response = tcpMessageSender.sendMessage(registerRequest, bootstrapNode);
-
-        RegisterResponse registerResponse = new RegisterResponse();
-        registerResponse.deserialize(response);
-
-        LOGGER.info("register response received: \"{}\"", registerResponse.getStatus().toString());
-
-        return registerResponse;
-    }
-
-    private UnregisterResponse sendUnregisterRequest() throws IOException {
-        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, username);
-
-        LOGGER.info("send unregister request");
-
-        String response = tcpMessageSender.sendMessage(unregisterRequest, bootstrapNode);
-
-        UnregisterResponse unregisterResponse = new UnregisterResponse();
-        unregisterResponse.deserialize(response);
-
-        LOGGER.info("unregister response received: \"{}\"", unregisterResponse.getStatus().toString());
-
-        return unregisterResponse;
-    }
-
-    private void sendNodeDiscoveredGossip(Node discoveredNode, Node destinationNode) throws IOException {
-        GossipMessage gossipMessage = new GossipMessage(discoveredNode);
-
-        if (discoveredNode.getId().equals(destinationNode.getId())) {
-            LOGGER.warn("cannot send node: \"{}\" discovered gossip to same node: \"{}\"", discoveredNode.getId(), destinationNode.getId());
-            return;
-        }
-
-        LOGGER.info("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
-
-        udpMessageSender.sendMessage(gossipMessage, destinationNode);
-    }
-
-    private void sendHeartBeatMessage(Node destinationNode) throws IOException {
-        HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
-
-        LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
-        udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
-    }
-
     private void startJoinRetry() {
         this.joinExecutor.scheduleAtFixedRate(() -> {
             synchronized (this) {
@@ -276,9 +221,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
                     for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
                         try {
-                            this.joinLeaveManager.submitJoinRequest(n).subscribe(status -> {
-                                if (status) nodeConnected(n);
-                            });
+                            this.submitJoinRequest(n);
                         } catch (IOException e) {
                             LOGGER.error(e.getMessage(), e);
                         }
@@ -317,9 +260,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
                 unresponsiveNodes.forEach(un -> {
                     try {
-                        this.joinLeaveManager.submitJoinRequest(un).subscribe(status -> {
-                            if (status) nodeConnected(un);
-                        });
+                        this.submitJoinRequest(un);
                     } catch (IOException e) {
                         LOGGER.error(e.getMessage(), e);
                     }
@@ -365,5 +306,71 @@ public class ClusterManagerImpl implements ClusterManager {
         }, gossipInterval, gossipInterval, TimeUnit.SECONDS);
 
         LOGGER.info("gossip sender started");
+    }
+
+    private RegisterResponse sendRegisterRequest() throws IOException {
+        RegisterRequest registerRequest = new RegisterRequest(myNode, username);
+
+        LOGGER.info("send register request");
+
+        String response = tcpMessageSender.sendMessage(registerRequest, bootstrapNode);
+
+        RegisterResponse registerResponse = new RegisterResponse();
+        registerResponse.deserialize(response);
+
+        LOGGER.info("register response received: \"{}\"", registerResponse.getStatus().toString());
+
+        return registerResponse;
+    }
+
+    private UnregisterResponse sendUnregisterRequest() throws IOException {
+        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, username);
+
+        LOGGER.info("send unregister request");
+
+        String response = tcpMessageSender.sendMessage(unregisterRequest, bootstrapNode);
+
+        UnregisterResponse unregisterResponse = new UnregisterResponse();
+        unregisterResponse.deserialize(response);
+
+        LOGGER.info("unregister response received: \"{}\"", unregisterResponse.getStatus().toString());
+
+        return unregisterResponse;
+    }
+
+    private void sendNodeDiscoveredGossip(Node discoveredNode, Node destinationNode) throws IOException {
+        GossipMessage gossipMessage = new GossipMessage(discoveredNode);
+
+        if (discoveredNode.getId().equals(destinationNode.getId())) {
+            LOGGER.trace("cannot send node: \"{}\" discovered gossip to same node: \"{}\"", discoveredNode.getId(), destinationNode.getId());
+            return;
+        }
+
+        LOGGER.trace("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
+
+        udpMessageSender.sendMessage(gossipMessage, destinationNode);
+    }
+
+    private void sendHeartBeatMessage(Node destinationNode) throws IOException {
+        HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
+
+        LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
+        udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
+    }
+
+    private void submitJoinRequest(Node destinationNode) throws IOException {
+        PeerJoinRequest peerJoinRequest = new PeerJoinRequest(myNode);
+
+        joinLeaveManager.submitJoinRequest(peerJoinRequest, destinationNode).subscribe(status -> {
+            if (status == PeerResponseStatus.SUCCESSFUL) nodeConnected(destinationNode);
+        });
+    }
+
+    private void submitLeaveRequest(Node destinationNode) throws IOException {
+        PeerLeaveRequest peerLeaveRequest = new PeerLeaveRequest(myNode);
+
+        joinLeaveManager.submitLeaveRequest(peerLeaveRequest, destinationNode).subscribe(status -> {
+            if (status == PeerResponseStatus.SUCCESSFUL) nodeDisconnected(destinationNode);
+        });
     }
 }

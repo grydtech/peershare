@@ -20,15 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Component
 public class DistributedClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DistributedClient.class);
-
-    private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
     private final UDPMessageListener udpMessageListener;
     private final ClusterManager clusterManager;
@@ -118,7 +114,7 @@ public class DistributedClient {
         LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNode().getId());
 
         clusterManager.nodeConnected(peerJoinRequest.getNode());
-        joinLeaveManager.acceptJoinRequest(peerJoinRequest.getMessageId(), peerJoinRequest.getNode());
+        joinLeaveManager.handleJoinRequest(peerJoinRequest);
     }
 
     private void handleJoinResponse(String message) {
@@ -127,7 +123,7 @@ public class DistributedClient {
 
         LOGGER.info("join response received");
 
-        joinLeaveManager.submitResponse(peerJoinResponse.getMessageId(), peerJoinResponse.getStatus());
+        joinLeaveManager.handleJoinResponse(peerJoinResponse);
     }
 
     private void handleLeaveRequest(String message) throws IOException {
@@ -137,7 +133,7 @@ public class DistributedClient {
         LOGGER.info("leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
 
         clusterManager.nodeDisconnected(peerLeaveRequest.getNode());
-        joinLeaveManager.acceptLeaveRequest(peerLeaveRequest.getMessageId(), peerLeaveRequest.getNode());
+        joinLeaveManager.handleLeaveRequest(peerLeaveRequest);
     }
 
     private void handleLeaveResponse(String message) {
@@ -146,7 +142,7 @@ public class DistributedClient {
 
         LOGGER.info("leave response received");
 
-        joinLeaveManager.submitResponse(peerLeaveResponse.getMessageId(), peerLeaveResponse.getStatus());
+        joinLeaveManager.handleLeaveResponse(peerLeaveResponse);
     }
 
     private void handleNodeDiscoveredGossip(String message) throws IOException {
@@ -173,7 +169,7 @@ public class DistributedClient {
 
         LOGGER.info("file search request: \"{}\" received from: \"{}\"", fileSearchRequest.getKeyword(), fileSearchRequest.getNode().getId());
 
-        fileSearchManager.acceptSearchRequest(fileSearchRequest.getMessageId(), fileSearchRequest.getKeyword(), fileSearchRequest.getNode(), fileSearchRequest.getHop());
+        fileSearchManager.handleFileSearchRequest(fileSearchRequest);
 
         reporter.reportSearchAccepted(fileSearchRequest.getMessageId(), fileSearchRequest.getHop());
     }
@@ -184,7 +180,7 @@ public class DistributedClient {
 
         LOGGER.info("file search response: \"{}\" received from: \"{}\"", fileSearchResponse.getStatus().toString(), fileSearchResponse.getNode().getId());
 
-        fileSearchManager.submitSearchResult(fileSearchResponse.getMessageId(), fileSearchResponse.getFileNames(), fileSearchResponse.getNode(), fileSearchResponse.getHops());
+        fileSearchManager.handleFileSearchResponse(fileSearchResponse);
 
         reporter.reportResultReceived(fileSearchResponse.getMessageId(), fileSearchResponse.getFileNames().size(), fileSearchResponse.getHops(), fileSearchResponse.getNode().getId());
     }

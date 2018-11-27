@@ -1,22 +1,23 @@
 package com.grydtech.peershare.distributed.services;
 
 import com.grydtech.peershare.distributed.models.Node;
-import com.grydtech.peershare.distributed.models.peer.PeerResponseStatus;
+import com.grydtech.peershare.distributed.models.peer.*;
 import com.grydtech.peershare.shared.services.Manager;
 import io.reactivex.Observable;
 
 import java.io.IOException;
-import java.util.UUID;
 
 public interface JoinLeaveManager extends Manager {
 
-    Observable<Boolean> submitJoinRequest(Node destinationNode) throws IOException;
+    Observable<PeerResponseStatus> submitJoinRequest(PeerJoinRequest peerJoinRequest, Node destinationNode) throws IOException;
 
-    void acceptJoinRequest(UUID requestId, Node node) throws IOException;
+    void handleJoinRequest(PeerJoinRequest peerJoinRequest) throws IOException;
 
-    Observable<Boolean> submitLeaveRequest(Node destinationNode) throws IOException;
+    void handleJoinResponse(PeerJoinResponse peerJoinResponse);
 
-    void acceptLeaveRequest(UUID requestId, Node node) throws IOException;
+    Observable<PeerResponseStatus> submitLeaveRequest(PeerLeaveRequest peerLeaveRequest, Node destinationNode) throws IOException;
 
-    void submitResponse(UUID requestId, PeerResponseStatus status);
+    void handleLeaveRequest(PeerLeaveRequest peerLeaveRequest) throws IOException;
+
+    void handleLeaveResponse(PeerLeaveResponse peerLeaveResponse);
 }

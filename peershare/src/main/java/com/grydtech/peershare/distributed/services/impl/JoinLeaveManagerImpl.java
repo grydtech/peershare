@@ -27,7 +27,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    private final Map<String, BehaviorSubject<Boolean>> requestMap = new HashMap<>();
+    private final Map<String, BehaviorSubject<PeerResponseStatus>> requestMap = new HashMap<>();
     private final List<MessageInfo> messages = new ArrayList<>();
 
     @Value("${join.timeout}")
@@ -43,11 +43,9 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     }
 
     @Override
-    public Observable<Boolean> submitJoinRequest(Node destinationNode) throws IOException {
+    public Observable<PeerResponseStatus> submitJoinRequest(PeerJoinRequest peerJoinRequest, Node destinationNode) throws IOException {
         LOGGER.info("join request submitted");
-
-        BehaviorSubject<Boolean> behaviorSubject = BehaviorSubject.create();
-        PeerJoinRequest peerJoinRequest = new PeerJoinRequest(myNode);
+        BehaviorSubject<PeerResponseStatus> behaviorSubject = BehaviorSubject.create();
 
         synchronized (this) {
             LOGGER.trace("add request; \"{}\" to queue for cleanup", peerJoinRequest.getMessageId());
@@ -64,20 +62,24 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     }
 
     @Override
-    public void acceptJoinRequest(UUID requestId, Node destinationNode) throws IOException {
-        PeerJoinResponse peerJoinResponse = new PeerJoinResponse(PeerResponseStatus.SUCCESSFUL, requestId);
+    public void handleJoinRequest(PeerJoinRequest peerJoinRequest) throws IOException {
+        PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse(PeerResponseStatus.SUCCESSFUL, peerJoinRequest.getMessageId());
 
-        LOGGER.info("send join response to: \"{}\"", destinationNode.getId());
+        LOGGER.info("send leave response to: \"{}\"", peerJoinRequest.getNode().getId());
 
-        udpMessageSender.sendMessage(peerJoinResponse, destinationNode);
+        udpMessageSender.sendMessage(peerLeaveResponse, peerJoinRequest.getNode());
     }
 
     @Override
-    public Observable<Boolean> submitLeaveRequest(Node destinationNode) throws IOException {
+    public void handleJoinResponse(PeerJoinResponse peerJoinResponse) {
+        handleResponse(peerJoinResponse.getMessageId(), peerJoinResponse.getStatus());
+    }
+
+    @Override
+    public Observable<PeerResponseStatus> submitLeaveRequest(PeerLeaveRequest peerLeaveRequest, Node destinationNode) throws IOException {
         LOGGER.info("leave request submitted");
 
-        BehaviorSubject<Boolean> behaviorSubject = BehaviorSubject.create();
-        PeerLeaveRequest peerLeaveRequest = new PeerLeaveRequest(myNode);
+        BehaviorSubject<PeerResponseStatus> behaviorSubject = BehaviorSubject.create();
 
         synchronized (this) {
             LOGGER.trace("add request; \"{}\" to queue for cleanup", peerLeaveRequest.getMessageId());
@@ -94,33 +96,17 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     }
 
     @Override
-    public void acceptLeaveRequest(UUID requestId, Node destinationNode) throws IOException {
-        PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse(PeerResponseStatus.SUCCESSFUL, requestId);
+    public void handleLeaveRequest(PeerLeaveRequest peerLeaveRequest) throws IOException {
+        PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse(PeerResponseStatus.SUCCESSFUL, peerLeaveRequest.getMessageId());
 
-        LOGGER.info("send leave response to: \"{}\"", destinationNode.getId());
+        LOGGER.info("send leave response to: \"{}\"", peerLeaveRequest.getNode().getId());
 
-        udpMessageSender.sendMessage(peerLeaveResponse, destinationNode);
+        udpMessageSender.sendMessage(peerLeaveResponse, peerLeaveRequest.getNode());
     }
 
     @Override
-    public synchronized void submitResponse(UUID requestId, PeerResponseStatus status) {
-        BehaviorSubject<Boolean> behaviorSubject = requestMap.get(requestId.toString());
-
-        if (behaviorSubject == null) {
-            LOGGER.warn("request: \"{}\" timed out", requestId.toString());
-            return;
-        }
-
-        LOGGER.trace("emit received response via behaviour subject");
-
-        if (status == PeerResponseStatus.SUCCESSFUL) {
-            behaviorSubject.onNext(true);
-        } else {
-            behaviorSubject.onNext(false);
-        }
-
-        requestMap.remove(requestId.toString());
-        messages.removeIf(messageInfo -> messageInfo.getMessageId().toString().equals(requestId.toString()));
+    public void handleLeaveResponse(PeerLeaveResponse peerLeaveResponse) {
+        handleResponse(peerLeaveResponse.getMessageId(), peerLeaveResponse.getStatus());
     }
 
     @Override
@@ -133,7 +119,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
 
                 expiredMessages.forEach(em -> {
                     String key = em.getMessageId().toString();
-                    BehaviorSubject<Boolean> behaviorSubject = requestMap.get(key);
+                    BehaviorSubject<PeerResponseStatus> behaviorSubject = requestMap.get(key);
                     requestMap.remove(key);
                     behaviorSubject.onComplete();
 
@@ -159,5 +145,21 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
         this.scheduledExecutorService.shutdown();
 
         LOGGER.info("join leave manager stopped");
+    }
+
+    private synchronized void handleResponse(UUID requestId, PeerResponseStatus status) {
+        BehaviorSubject<PeerResponseStatus> behaviorSubject = requestMap.get(requestId.toString());
+
+        if (behaviorSubject == null) {
+            LOGGER.warn("request: \"{}\" timed out", requestId.toString());
+            return;
+        }
+
+        LOGGER.trace("emit received response via behaviour subject");
+
+        behaviorSubject.onNext(status);
+
+        requestMap.remove(requestId.toString());
+        messages.removeIf(messageInfo -> messageInfo.getMessageId().toString().equals(requestId.toString()));
     }
 }

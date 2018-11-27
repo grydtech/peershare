@@ -5,7 +5,6 @@ import com.grydtech.peershare.distributed.models.Node;
 import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
 import com.grydtech.peershare.distributed.models.search.FileSearchResponseStatus;
-import com.grydtech.peershare.distributed.models.search.FileSearchResult;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.files.models.FileInfo;
@@ -33,7 +32,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    private final Map<String, BehaviorSubject<FileSearchResult>> searchMap = new HashMap<>();
+    private final Map<String, BehaviorSubject<FileSearchResponse>> searchMap = new HashMap<>();
     private final List<MessageInfo> messages = new ArrayList<>();
 
     @Value("${search.timeout}")
@@ -56,64 +55,6 @@ public class FileSearchManagerImpl implements FileSearchManager {
     }
 
     @Override
-    public Observable<FileSearchResult> submitSearch(UUID searchId, String keyword) throws IOException {
-        BehaviorSubject<FileSearchResult> behaviorSubject = BehaviorSubject.create();
-        List<FileInfo> myFiles = fileStore.search(keyword);
-
-        LOGGER.info("file search request submitted: \"{}\"", keyword);
-
-        synchronized (this) {
-            LOGGER.trace("add search; \"{}\" to queue for cleanup", searchId);
-
-            messages.add(new MessageInfo(searchId));
-
-            FileSearchResult fileSearchResult = new FileSearchResult(myNode, myFiles, 0);
-            behaviorSubject.onNext(fileSearchResult);
-
-            searchMap.put(searchId.toString(), behaviorSubject);
-        }
-
-        LOGGER.info("send file search request to known nodes");
-
-        for (Node n : clusterManager.getConnectedCluster()) {
-            sendFileSearchRequest(keyword, myNode, n, searchId, 1);
-        }
-
-        return behaviorSubject;
-    }
-
-    @Override
-    public void submitSearchResult(UUID searchId, List<String> discoveredFiles, Node node, int hops) {
-        synchronized (this) {
-            BehaviorSubject<FileSearchResult> behaviorSubject = searchMap.get(searchId.toString());
-
-            if (behaviorSubject != null) {
-                List<FileInfo> files = discoveredFiles.stream().map(FileInfo::new).collect(Collectors.toList());
-                FileSearchResult fileSearchResult = new FileSearchResult(node, files, hops);
-
-                LOGGER.info("push received search results");
-
-                behaviorSubject.onNext(fileSearchResult);
-            } else {
-                LOGGER.warn("search already completed");
-            }
-        }
-    }
-
-    @Override
-    public void acceptSearchRequest(UUID searchId, String keyWord, Node startNode, int hop) throws IOException {
-        List<String> fileNames = fileStore.search(keyWord).stream().map(FileInfo::getName).collect(Collectors.toList());
-
-        sendFileSearchResponse(fileNames, startNode, searchId, hop);
-
-        LOGGER.info("send file search request to random nodes");
-
-        for (Node n : clusterManager.getConnectedCluster()) {
-            sendFileSearchRequest(keyWord, startNode, n, searchId, hop + 1);
-        }
-    }
-
-    @Override
     public void startService() {
         LOGGER.info("file search manager started");
 
@@ -123,7 +64,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
                 expiredMessages.forEach(em -> {
                     String key = em.getMessageId().toString();
-                    BehaviorSubject<FileSearchResult> behaviorSubject = searchMap.get(key);
+                    BehaviorSubject<FileSearchResponse> behaviorSubject = searchMap.get(key);
                     searchMap.remove(key);
                     behaviorSubject.onComplete();
 
@@ -149,6 +90,61 @@ public class FileSearchManagerImpl implements FileSearchManager {
         this.scheduledExecutorService.shutdown();
 
         LOGGER.info("file search manager stopped");
+    }
+
+    @Override
+    public Observable<FileSearchResponse> submitFileSearchRequest(FileSearchRequest fileSearchRequest) throws IOException {
+        BehaviorSubject<FileSearchResponse> behaviorSubject = BehaviorSubject.create();
+        List<String> fileList = fileStore.search(fileSearchRequest.getKeyword()).stream().map(FileInfo::getName).collect(Collectors.toList());
+
+        LOGGER.info("file search request submitted: \"{}\"", fileSearchRequest.getKeyword());
+
+        synchronized (this) {
+            LOGGER.trace("add search; \"{}\" to queue for cleanup", fileSearchRequest.getMessageId().toString());
+
+            messages.add(new MessageInfo(fileSearchRequest.getMessageId()));
+
+            FileSearchResponse fileSearchResponse = new FileSearchResponse(myNode, fileList, fileSearchRequest.getMessageId(), 0, FileSearchResponseStatus.fromCode(fileList.size()));
+            behaviorSubject.onNext(fileSearchResponse);
+
+            searchMap.put(fileSearchRequest.getMessageId().toString(), behaviorSubject);
+        }
+
+        LOGGER.info("send file search request to known nodes");
+
+        for (Node n : clusterManager.getConnectedCluster()) {
+            sendFileSearchRequest(fileSearchRequest.getKeyword(), myNode, n, fileSearchRequest.getMessageId(), 1);
+        }
+
+        return behaviorSubject;
+    }
+
+    @Override
+    public void handleFileSearchRequest(FileSearchRequest fileSearchRequest) throws IOException {
+        List<String> fileNames = fileStore.search(fileSearchRequest.getKeyword()).stream().map(FileInfo::getName).collect(Collectors.toList());
+
+        sendFileSearchResponse(fileNames, fileSearchRequest.getNode(), fileSearchRequest.getMessageId(), fileSearchRequest.getHop());
+
+        LOGGER.info("send file search request to random nodes");
+
+        for (Node n : clusterManager.getConnectedCluster()) {
+            sendFileSearchRequest(fileSearchRequest.getKeyword(), fileSearchRequest.getNode(), n, fileSearchRequest.getMessageId(), fileSearchRequest.getHop() + 1);
+        }
+    }
+
+    @Override
+    public void handleFileSearchResponse(FileSearchResponse fileSearchResponse) {
+        synchronized (this) {
+            BehaviorSubject<FileSearchResponse> behaviorSubject = searchMap.get(fileSearchResponse.getMessageId().toString());
+
+            if (behaviorSubject != null) {
+                LOGGER.info("push received search results");
+
+                behaviorSubject.onNext(fileSearchResponse);
+            } else {
+                LOGGER.warn("search already completed");
+            }
+        }
     }
 
     private void sendFileSearchRequest(String keyword, Node startNode, Node destinationNode, UUID requestId, int hop) throws IOException {

@@ -1,8 +1,11 @@
 package com.grydtech.peershare.web.controllers;
 
-import com.grydtech.peershare.distributed.models.search.FileSearchResult;
+import com.grydtech.peershare.distributed.models.Node;
+import com.grydtech.peershare.distributed.models.search.FileSearchRequest;
+import com.grydtech.peershare.distributed.models.search.FileSearchResponse;
 import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
+import com.grydtech.peershare.files.models.FileInfo;
 import com.grydtech.peershare.report.services.Reporter;
 import com.grydtech.peershare.web.models.RoutingTableResponse;
 import com.grydtech.peershare.web.models.SearchRequest;
@@ -27,25 +30,29 @@ public class WebSocketController {
     private final FileSearchManager fileSearchManager;
     private final ClusterManager clusterManager;
     private final Reporter reporter;
+    private final Node myNode;
 
     @Autowired
-    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager, Reporter reporter) {
+    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager, Reporter reporter, Node myNode) {
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.fileSearchManager = fileSearchManager;
         this.clusterManager = clusterManager;
         this.reporter = reporter;
+        this.myNode = myNode;
     }
 
     @MessageMapping("/search")
     public void search(SearchRequest searchRequest) throws IOException {
         LOGGER.info("file search request received searchText: \"{}\"", searchRequest.getSearchText());
 
-        Observable<FileSearchResult> resultObservable = fileSearchManager.submitSearch(UUID.fromString(searchRequest.getSearchId()), searchRequest.getSearchText());
+        FileSearchRequest fileSearchRequest = new FileSearchRequest(myNode, searchRequest.getSearchText(), UUID.fromString(searchRequest.getSearchId()), 0);
+        Observable<FileSearchResponse> resultObservable = fileSearchManager.submitFileSearchRequest(fileSearchRequest);
 
         reporter.reportSearchStarted(UUID.fromString(searchRequest.getSearchId()));
 
-        resultObservable.subscribe(fileSearchResult -> fileSearchResult.getFiles().forEach(f -> {
-            SearchResult searchResult = new SearchResult(f.getId(), f.getName(), fileSearchResult.getNode().getHost(), fileSearchResult.getNode().getPort());
+        resultObservable.subscribe(fileSearchResponse -> fileSearchResponse.getFileNames().forEach(fn -> {
+            FileInfo fileInfo = new FileInfo(fn);
+            SearchResult searchResult = new SearchResult(fileInfo.getId(), fileInfo.getName(), fileSearchResponse.getNode().getHost(), fileSearchResponse.getNode().getPort());
             SearchResponse searchResponse = new SearchResponse(searchRequest.getSearchId(), searchResult);
             simpMessagingTemplate.convertAndSend("/topic/results", searchResponse);
         }));
