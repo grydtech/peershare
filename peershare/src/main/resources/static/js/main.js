@@ -2,6 +2,13 @@ let searchId;
 const searchResults = [];
 const routingTable = [];
 
+const downloadStatus = {
+    inProgress: false,
+    fileName: '',
+    filePath: '',
+    status: 'UNKNOWN'
+};
+
 const socket = new SockJS('/ws');
 const stompClient = Stomp.over(socket);
 
@@ -18,6 +25,12 @@ stompClient.connect({}, function (frame1) {
         const response = JSON.parse(frame2.body);
 
         updateRoutingTable(response.table);
+    });
+
+    stompClient.subscribe('/topic/download', function (frame2) {
+        const response = JSON.parse(frame2.body);
+
+        updateDownloadProgress(response.fileName, response.filePath, response.status);
     });
 
     stompClient.send("/app/info");
@@ -42,6 +55,14 @@ function sendSearch(searchText) {
     stompClient.send("/app/search", {}, JSON.stringify({searchId: searchId, searchText: searchText}));
 }
 
+function downloadFile(fileName, fileUrl) {
+    downloadStatus.inProgress = true;
+
+    stompClient.send("/app/download", {}, JSON.stringify({fileName: fileName, fileUrl: fileUrl}));
+
+    setTimeout(() => downloadInProgress = false, 20000);
+}
+
 function addSearchResult(id, searchResult) {
     if (id !== searchId) return;
 
@@ -62,18 +83,30 @@ function updateRoutingTable(result) {
     }
 }
 
+function updateDownloadProgress(fileName, filePath, status) {
+    downloadStatus.inProgress = false;
+    downloadStatus.fileName = fileName;
+    downloadStatus.filePath = filePath;
+    downloadStatus.status = status;
+
+    $('#verificationModal').modal()
+}
+
 const app = new Vue({
     el: '#app',
     data: {
         routingTable: routingTable,
         searchResults: searchResults,
-        searchText: ''
+        searchText: '',
+        downloadStatus: downloadStatus
     },
     methods: {
         search: function () {
             if (!this.searchText || this.searchText === '') return;
-
             sendSearch(this.searchText);
+        },
+        download: function (fileName, fileUrl) {
+            downloadFile(fileName, fileUrl);
         }
     }
 });

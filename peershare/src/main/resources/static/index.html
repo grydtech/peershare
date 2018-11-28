@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" xmlns:v-on="http://www.w3.org/1999/xhtml" xmlns:v-bind="http://www.w3.org/1999/xhtml">
+<html xmlns:v-on="http://www.w3.org/1999/xhtml" lang="en">
 
 <head>
     <!-- Required meta tags -->
@@ -10,8 +10,13 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
           integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 
+    <!-- FontAwesome CSS -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+          integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/loading.css">
 
     <title>PeerShare</title>
 </head>
@@ -19,6 +24,7 @@
 <body>
 
 <div id="app">
+
     <nav class="navbar fixed-top navbar-dark bg-dark">
         <a class="navbar-brand" href="#">
             <img src="imgs/logo-grydtech.png" class="d-inline-block align-top logo" alt="">
@@ -40,18 +46,18 @@
 
                 <table class="table table-striped">
                     <thead>
-                        <tr>
-                            <th scope="col">Host</th>
-                            <th scope="col">Port (TCP)</th>
-                            <th scope="col">Port (UDP)</th>
-                        </tr>
+                    <tr>
+                        <th scope="col">Host</th>
+                        <th scope="col">Port (TCP)</th>
+                        <th scope="col">Port (UDP)</th>
+                    </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="entry in routingTable">
-                            <td>{{entry.host}}</td>
-                            <td>{{entry.port}}</td>
-                            <td>{{entry.udpPort}}</td>
-                        </tr>
+                    <tr v-for="entry in routingTable">
+                        <td>{{entry.host}}</td>
+                        <td>{{entry.port}}</td>
+                        <td>{{entry.udpPort}}</td>
+                    </tr>
                     </tbody>
                 </table>
             </div>
@@ -63,13 +69,74 @@
                     <div class="card-body">
                         <h5 class="card-title">Name: {{searchResult.fileName}}</h5>
                         <h6 class="card-subtitle mb-2 text-muted">Url: {{searchResult.fileUrl}}</h6>
-                        <a v-bind:href="searchResult.fileUrl" target="_blank" class="btn btn-primary">Download</a>
+                        <button v-on:click="download(searchResult.fileName, searchResult.fileUrl)"
+                                class="btn btn-primary">Download
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <div v-if="downloadStatus.inProgress" class="loading-area">
+        <div class="loading">
+            <div class="lds-css ng-scope">
+                <div class="lds-spinner" style="width: 100%; height:100%">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="verificationModal" tabindex="-1" role="dialog"
+         aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLongTitle">File Download Status</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    File saved to <span class="text-primary">{{downloadStatus.filePath}}</span><br>
+                    File verification
+                    <span v-if="downloadStatus.status === 'VALIDATION_SUCCESSFUL'"
+                          class="text-success">Successful</span>
+                    <span v-if="downloadStatus.status === 'VALIDATION_FAILED' || downloadStatus.status === 'DOWNLOAD_FAILED'"
+                          class="text-danger">Failed</span>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<!-- Bootstrap -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+        integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+        integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+        crossorigin="anonymous"></script>
 
 <!-- Vue.js -->
 <script src="https://unpkg.com/vue"></script>

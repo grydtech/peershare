@@ -61,7 +61,7 @@ public class DownloaderImpl implements Downloader {
         LOGGER.info("generated hash value: \"{}\"", sha1HashGenerated);
 
         if (sha1HashGenerated.equals(sha1HashReceived)) {
-            return new DownloadResponse(file.getName(), file.getAbsolutePath(), DownloadStatus.VALIDATION_SUCCESS);
+            return new DownloadResponse(file.getName(), file.getAbsolutePath(), DownloadStatus.VALIDATION_SUCCESSFUL);
         } else {
             return new DownloadResponse(file.getName(), file.getAbsolutePath(), DownloadStatus.VALIDATION_FAILED);
         }

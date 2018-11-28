@@ -46,7 +46,7 @@ public class FileDownloadController {
 
         String sha1Hash = DigestUtils.sha1Hex(new FileInputStream(file)).toUpperCase();
 
-        LOGGER.info("checksum value (sha1): \"{}\"", sha1Hash);
+        LOGGER.info("generated hash value: \"{}\"", sha1Hash);
 
         InputStreamResource inputStreamResource = new InputStreamResource(new FileInputStream(file));
 

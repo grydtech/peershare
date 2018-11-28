@@ -70,9 +70,10 @@ public class WebSocketController {
     }
 
     @MessageMapping("/download")
-    public DownloadResponse download(DownloadRequest downloadRequest) throws IOException {
+    public void download(DownloadRequest downloadRequest) throws IOException {
         LOGGER.info("download request received");
 
-        return downloader.download(downloadRequest);
+        DownloadResponse downloadResponse = downloader.download(downloadRequest);
+        simpMessagingTemplate.convertAndSend("/topic/download", downloadResponse);
     }
 }
