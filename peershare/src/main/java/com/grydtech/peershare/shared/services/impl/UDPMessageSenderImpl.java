@@ -33,6 +33,6 @@ public class UDPMessageSenderImpl implements UDPMessageSender {
 
         udpSocket.send(packet);
 
-        LOGGER.trace("request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
+        LOGGER.info("request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
     }
 }

@@ -23,7 +23,7 @@ public class TCPMessageSenderImpl implements TCPMessageSender {
 
         String messageString = message.serialize();
 
-        LOGGER.trace("request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
+        LOGGER.info("request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
 
         pw.println(messageString);
 
@@ -32,7 +32,7 @@ public class TCPMessageSenderImpl implements TCPMessageSender {
 
         String response = String.valueOf(data, 0, count);
 
-        LOGGER.trace("response: \"{}\" received from: \"{}\"", response, destinationNode.getId());
+        LOGGER.info("response: \"{}\" received from: \"{}\"", response, destinationNode.getId());
 
         return response;
     }

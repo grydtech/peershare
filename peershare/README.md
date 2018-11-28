@@ -5,7 +5,7 @@ Distributed Systems (CS4262) - Group Project
 ## How to run
 Run application by providing base path where files located  
 ```
-java -jar peershare-1.0-SNAPSHOT.jar
+java -Dusername=randil -jar peershare-1.0-SNAPSHOT.jar
 ```
 
 ## Config options available

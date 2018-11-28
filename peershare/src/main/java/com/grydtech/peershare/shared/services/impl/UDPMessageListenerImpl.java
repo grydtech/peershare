@@ -44,7 +44,7 @@ public class UDPMessageListenerImpl implements UDPMessageListener {
 
                 String received = new String(packet.getData(), 0, packet.getLength());
 
-                LOGGER.trace("UDP packet received: \"{}\"", received);
+                LOGGER.info("UDP packet received: \"{}\"", received);
 
                 messages.onNext(received);
             }

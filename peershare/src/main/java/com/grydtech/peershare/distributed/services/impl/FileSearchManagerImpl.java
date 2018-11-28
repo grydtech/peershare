@@ -138,8 +138,6 @@ public class FileSearchManagerImpl implements FileSearchManager {
             BehaviorSubject<FileSearchResponse> behaviorSubject = searchMap.get(fileSearchResponse.getMessageId().toString());
 
             if (behaviorSubject != null) {
-                LOGGER.info("push received search results");
-
                 behaviorSubject.onNext(fileSearchResponse);
             } else {
                 LOGGER.warn("search already completed");
@@ -151,10 +149,10 @@ public class FileSearchManagerImpl implements FileSearchManager {
         FileSearchRequest fileSearchRequest = new FileSearchRequest(startNode, keyword, requestId, hop);
 
         if (startNode.getId().equals(destinationNode.getId())) {
-            LOGGER.warn("cannot send search request to same node");
+            LOGGER.trace("cannot send search request to same node");
             return;
         } else if (fileSearchRequest.isMaxHopsReached(searchMaxHops + 1)) {
-            LOGGER.warn("search max hop count reached");
+            LOGGER.trace("search max hop count reached");
             return;
         }
 

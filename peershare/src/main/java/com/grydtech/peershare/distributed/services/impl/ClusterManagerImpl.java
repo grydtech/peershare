@@ -148,7 +148,7 @@ public class ClusterManagerImpl implements ClusterManager {
             LOGGER.info("connected node: \"{}\" added to cluster", connectedNode.getId());
         } else {
             node.get().resetTTL();
-            LOGGER.warn("node: \"{}\" already connected", connectedNode.getId());
+            LOGGER.trace("node: \"{}\" already connected", connectedNode.getId());
         }
     }
 
@@ -157,7 +157,7 @@ public class ClusterManagerImpl implements ClusterManager {
         this.knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
         this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-        LOGGER.warn("disconnected node: \"{}\" removed from cluster", disconnectedNode.getId());
+        LOGGER.info("disconnected node: \"{}\" removed from cluster", disconnectedNode.getId());
     }
 
     @Override
@@ -346,7 +346,7 @@ public class ClusterManagerImpl implements ClusterManager {
             return;
         }
 
-        LOGGER.trace("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
+        LOGGER.info("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
 
         udpMessageSender.sendMessage(gossipMessage, destinationNode);
     }
@@ -354,7 +354,7 @@ public class ClusterManagerImpl implements ClusterManager {
     private void sendHeartBeatMessage(Node destinationNode) throws IOException {
         HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
 
-        LOGGER.trace("send heart beat message to: \"{}\"", destinationNode.getId());
+        LOGGER.info("send heart beat message to: \"{}\"", destinationNode.getId());
         udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
     }
 

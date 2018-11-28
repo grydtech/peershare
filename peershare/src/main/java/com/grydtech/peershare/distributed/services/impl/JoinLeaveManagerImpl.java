@@ -34,12 +34,10 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
     private int joinTimeout;
 
     private final UDPMessageSender udpMessageSender;
-    private final Node myNode;
 
     @Autowired
-    public JoinLeaveManagerImpl(UDPMessageSender udpMessageSender, Node myNode) {
+    public JoinLeaveManagerImpl(UDPMessageSender udpMessageSender) {
         this.udpMessageSender = udpMessageSender;
-        this.myNode = myNode;
     }
 
     @Override
@@ -155,7 +153,7 @@ public class JoinLeaveManagerImpl implements JoinLeaveManager {
             return;
         }
 
-        LOGGER.trace("emit received response via behaviour subject");
+        LOGGER.trace("push received response");
 
         behaviorSubject.onNext(status);
 
