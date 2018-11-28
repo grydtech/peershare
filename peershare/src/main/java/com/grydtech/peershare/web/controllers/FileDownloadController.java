@@ -44,11 +44,16 @@ public class FileDownloadController {
         FileInfo fileInfo = fileStore.get(id);
         File file = tempFileCreator.createTempFile(fileInfo.getName());
 
+        String sha1Hash = DigestUtils.sha1Hex(new FileInputStream(file)).toUpperCase();
+
+        LOGGER.info("checksum value (sha1): \"{}\"", sha1Hash);
+
         InputStreamResource inputStreamResource = new InputStreamResource(new FileInputStream(file));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + file.getName())
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                .header("Checksum-SHA1", sha1Hash)
                 .contentLength(file.length())
                 .body(inputStreamResource);
     }

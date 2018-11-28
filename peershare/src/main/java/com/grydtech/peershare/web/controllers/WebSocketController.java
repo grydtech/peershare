@@ -7,10 +7,8 @@ import com.grydtech.peershare.distributed.services.ClusterManager;
 import com.grydtech.peershare.distributed.services.FileSearchManager;
 import com.grydtech.peershare.files.models.FileInfo;
 import com.grydtech.peershare.report.services.Reporter;
-import com.grydtech.peershare.web.models.RoutingTableResponse;
-import com.grydtech.peershare.web.models.SearchRequest;
-import com.grydtech.peershare.web.models.SearchResponse;
-import com.grydtech.peershare.web.models.SearchResult;
+import com.grydtech.peershare.web.models.*;
+import com.grydtech.peershare.web.services.Downloader;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,14 +28,16 @@ public class WebSocketController {
     private final FileSearchManager fileSearchManager;
     private final ClusterManager clusterManager;
     private final Reporter reporter;
+    private final Downloader downloader;
     private final Node myNode;
 
     @Autowired
-    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager, Reporter reporter, Node myNode) {
+    public WebSocketController(SimpMessagingTemplate simpMessagingTemplate, FileSearchManager fileSearchManager, ClusterManager clusterManager, Reporter reporter, Downloader downloader, Node myNode) {
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.fileSearchManager = fileSearchManager;
         this.clusterManager = clusterManager;
         this.reporter = reporter;
+        this.downloader = downloader;
         this.myNode = myNode;
     }
 
@@ -67,5 +67,12 @@ public class WebSocketController {
         clusterManager.getConnectedClusterObservable().subscribe(nodes -> {
             simpMessagingTemplate.convertAndSend("/topic/routing-table", new RoutingTableResponse(nodes));
         });
+    }
+
+    @MessageMapping("/download")
+    public DownloadResponse download(DownloadRequest downloadRequest) throws IOException {
+        LOGGER.info("download request received");
+
+        return downloader.download(downloadRequest);
     }
 }
