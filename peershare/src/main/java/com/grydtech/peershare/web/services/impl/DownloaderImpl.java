@@ -40,7 +40,7 @@ public class DownloaderImpl implements Downloader {
         ResponseEntity<byte[]> response = restTemplate.exchange(downloadRequest.getFileUrl(), HttpMethod.GET, entity, byte[].class);
 
         if (response.getStatusCode() != HttpStatus.OK || response.getBody() == null) {
-            return new DownloadResponse(downloadRequest.getFileName(), null, DownloadStatus.DOWNLOAD_FAILED);
+            return new DownloadResponse(downloadRequest.getFileName(), null, null, null, 0, DownloadStatus.DOWNLOAD_FAILED);
         }
 
         LOGGER.info("file downloaded successfully");
@@ -60,10 +60,12 @@ public class DownloaderImpl implements Downloader {
 
         LOGGER.info("generated hash value: \"{}\"", sha1HashGenerated);
 
+        long fileSize = Long.parseLong(Objects.requireNonNull(response.getHeaders().get("Content-Length")).get(0));
+
         if (sha1HashGenerated.equals(sha1HashReceived)) {
-            return new DownloadResponse(file.getName(), file.getAbsolutePath(), DownloadStatus.VALIDATION_SUCCESSFUL);
+            return new DownloadResponse(file.getName(), file.getAbsolutePath(), sha1HashReceived, sha1HashGenerated, fileSize, DownloadStatus.VALIDATION_SUCCESSFUL);
         } else {
-            return new DownloadResponse(file.getName(), file.getAbsolutePath(), DownloadStatus.VALIDATION_FAILED);
+            return new DownloadResponse(file.getName(), file.getAbsolutePath(), sha1HashReceived, sha1HashGenerated, fileSize, DownloadStatus.VALIDATION_FAILED);
         }
     }
 }

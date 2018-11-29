@@ -112,6 +112,9 @@
                 </div>
                 <div class="modal-body">
                     File saved to <span class="text-primary">{{downloadStatus.filePath}}</span><br>
+                    File size: {{downloadStatus.fileSize}} bytes<br>
+                    File hash (received): {{downloadStatus.receivedHash}}<br>
+                    File hash (generated): {{downloadStatus.generatedHash}}<br>
                     File verification
                     <span v-if="downloadStatus.status === 'VALIDATION_SUCCESSFUL'"
                           class="text-success">Successful</span>
