@@ -9,9 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.util.Objects;
 
 @Configuration
@@ -34,13 +32,25 @@ public class BeanConfiguration {
         if (serverHost == null || serverHost.equals("")) {
             LOGGER.info("server host not found retrieving host");
 
-            InetAddress localhost = InetAddress.getLocalHost();
-            serverHost = localhost.getHostAddress().trim();
-
-            LOGGER.info("server host retrieved: \"{}\"", serverHost);
+            try (final DatagramSocket socket = new DatagramSocket()) {
+                socket.connect(new InetSocketAddress("8.8.8.8", 10002));
+                serverHost = socket.getLocalAddress().getHostAddress().trim();
+            }
         }
 
-        return new Node(serverHost, serverPort);
+        if ("0.0.0.0".equals(serverHost) || "127.0.0.1".equals(serverHost)) {
+            InetAddress localhost = InetAddress.getLocalHost();
+            serverHost = localhost.getHostAddress().trim();
+        }
+
+        LOGGER.info("server host retrieved: \"{}\"", serverHost);
+
+        if (environment.containsProperty("username")) {
+            String username = environment.getProperty("username");
+            return new Node(serverHost, serverPort, username);
+        } else {
+            return new Node(serverHost, serverPort);
+        }
     }
 
     @Bean

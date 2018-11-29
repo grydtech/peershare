@@ -52,8 +52,6 @@ public class ClusterManagerImpl implements ClusterManager {
     private int joinTimeout;
     @Value("${gossip.interval}")
     private int gossipInterval;
-    @Value("${username}")
-    private String username;
 
     private final JoinLeaveManager joinLeaveManager;
     private final TCPMessageSender tcpMessageSender;
@@ -309,7 +307,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     private RegisterResponse sendRegisterRequest() throws IOException {
-        RegisterRequest registerRequest = new RegisterRequest(myNode, username);
+        RegisterRequest registerRequest = new RegisterRequest(myNode);
 
         LOGGER.info("DISTRIBUTED: send register request");
 
@@ -324,7 +322,7 @@ public class ClusterManagerImpl implements ClusterManager {
     }
 
     private UnregisterResponse sendUnregisterRequest() throws IOException {
-        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, username);
+        UnregisterRequest unregisterRequest = new UnregisterRequest(myNode);
 
         LOGGER.info("DISTRIBUTED: send unregister request");
 

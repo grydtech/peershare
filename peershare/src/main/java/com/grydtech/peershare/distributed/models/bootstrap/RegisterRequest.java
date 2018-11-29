@@ -7,24 +7,18 @@ import com.grydtech.peershare.shared.models.SerializableMessage;
 public class RegisterRequest implements SerializableMessage {
 
     private final Node node;
-    private String username;
 
-    public RegisterRequest(Node node, String username) {
+    public RegisterRequest(Node node) {
         this.node = node;
-        this.username = username;
     }
 
     public Node getNode() {
         return node;
     }
 
-    public String getUsername() {
-        return username;
-    }
-
     @Override
     public String serialize() {
-        String s = String.format("%s %s %d %s", Command.REGISTER.toString(), this.node.getHost(), this.node.getPort(), this.username);
+        String s = String.format("%s %s %d %s", Command.REGISTER.toString(), this.node.getHost(), this.node.getPort(), this.getNode().getUsername());
         return String.format("%04d %s", s.length() + 5, s);
     }
 }
