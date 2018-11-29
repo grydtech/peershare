@@ -27,7 +27,7 @@ public class DownloaderImpl implements Downloader {
 
     @Override
     public DownloadResponse download(DownloadRequest downloadRequest) throws IOException {
-        LOGGER.info("start downloading file");
+        LOGGER.info("WEB: start downloading file");
 
         RestTemplate restTemplate = new RestTemplate();
         restTemplate.getMessageConverters().add(new ByteArrayHttpMessageConverter());
@@ -43,22 +43,22 @@ public class DownloaderImpl implements Downloader {
             return new DownloadResponse(downloadRequest.getFileName(), null, null, null, 0, DownloadStatus.DOWNLOAD_FAILED);
         }
 
-        LOGGER.info("file downloaded successfully");
-        LOGGER.info("write file content to disk");
+        LOGGER.info("WEB: file downloaded successfully");
+        LOGGER.info("WEB: write file content to disk");
 
         Files.write(Paths.get(downloadRequest.getFileName()), response.getBody());
 
-        LOGGER.info("start content verification");
+        LOGGER.info("WEB: start content verification");
 
         String sha1HashReceived = Objects.requireNonNull(response.getHeaders().get("Checksum-SHA1")).get(0);
 
-        LOGGER.info("received hash value: \"{}\"", sha1HashReceived);
+        LOGGER.info("WEB: received hash value: \"{}\"", sha1HashReceived);
 
         File file = new File(downloadRequest.getFileName());
 
         String sha1HashGenerated = DigestUtils.sha1Hex(new FileInputStream(file)).toUpperCase();
 
-        LOGGER.info("generated hash value: \"{}\"", sha1HashGenerated);
+        LOGGER.info("WEB: generated hash value: \"{}\"", sha1HashGenerated);
 
         long fileSize = Long.parseLong(Objects.requireNonNull(response.getHeaders().get("Content-Length")).get(0));
 

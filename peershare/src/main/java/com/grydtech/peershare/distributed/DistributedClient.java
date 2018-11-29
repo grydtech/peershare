@@ -102,7 +102,7 @@ public class DistributedClient {
                 handleNodeHeartBeatMessage(message);
                 break;
             case UNKNOWN:
-                LOGGER.error("unknown command received");
+                LOGGER.error("DISTRIBUTED: unknown command received");
                 break;
         }
     }
@@ -111,7 +111,7 @@ public class DistributedClient {
         PeerJoinRequest peerJoinRequest = new PeerJoinRequest();
         peerJoinRequest.deserialize(message);
 
-        LOGGER.info("join request received from: \"{}\"", peerJoinRequest.getNode().getId());
+        LOGGER.info("DISTRIBUTED: join request received from: \"{}\"", peerJoinRequest.getNode().getId());
 
         clusterManager.nodeConnected(peerJoinRequest.getNode());
         joinLeaveManager.handleJoinRequest(peerJoinRequest);
@@ -121,7 +121,7 @@ public class DistributedClient {
         PeerJoinResponse peerJoinResponse = new PeerJoinResponse();
         peerJoinResponse.deserialize(message);
 
-        LOGGER.info("join response received");
+        LOGGER.info("DISTRIBUTED: join response received");
 
         joinLeaveManager.handleJoinResponse(peerJoinResponse);
     }
@@ -130,7 +130,7 @@ public class DistributedClient {
         PeerLeaveRequest peerLeaveRequest = new PeerLeaveRequest();
         peerLeaveRequest.deserialize(message);
 
-        LOGGER.info("leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
+        LOGGER.info("DISTRIBUTED: leave request received from: \"{}\"", peerLeaveRequest.getNode().getId());
 
         clusterManager.nodeDisconnected(peerLeaveRequest.getNode());
         joinLeaveManager.handleLeaveRequest(peerLeaveRequest);
@@ -140,7 +140,7 @@ public class DistributedClient {
         PeerLeaveResponse peerLeaveResponse = new PeerLeaveResponse();
         peerLeaveResponse.deserialize(message);
 
-        LOGGER.info("leave response received");
+        LOGGER.info("DISTRIBUTED: leave response received");
 
         joinLeaveManager.handleLeaveResponse(peerLeaveResponse);
     }
@@ -158,7 +158,7 @@ public class DistributedClient {
         HeartBeatMessage heartBeatMessage = new HeartBeatMessage();
         heartBeatMessage.deserialize(message);
 
-        LOGGER.trace("node: \"{}\" alive gossip received", heartBeatMessage.getNode().getId());
+        LOGGER.trace("DISTRIBUTED: node: \"{}\" alive gossip received", heartBeatMessage.getNode().getId());
 
         clusterManager.nodeReset(heartBeatMessage.getNode());
     }
@@ -167,7 +167,7 @@ public class DistributedClient {
         FileSearchRequest fileSearchRequest = new FileSearchRequest();
         fileSearchRequest.deserialize(message);
 
-        LOGGER.info("file search request: \"{}\" received from: \"{}\"", fileSearchRequest.getKeyword(), fileSearchRequest.getNode().getId());
+        LOGGER.info("DISTRIBUTED: file search request: \"{}\" received from: \"{}\"", fileSearchRequest.getKeyword(), fileSearchRequest.getNode().getId());
 
         fileSearchManager.handleFileSearchRequest(fileSearchRequest);
 
@@ -178,7 +178,7 @@ public class DistributedClient {
         FileSearchResponse fileSearchResponse = new FileSearchResponse();
         fileSearchResponse.deserialize(message);
 
-        LOGGER.info("file search response: \"{}\" received from: \"{}\"", fileSearchResponse.getStatus().toString(), fileSearchResponse.getNode().getId());
+        LOGGER.info("DISTRIBUTED: file search response: \"{}\" received from: \"{}\"", fileSearchResponse.getStatus().toString(), fileSearchResponse.getNode().getId());
 
         fileSearchManager.handleFileSearchResponse(fileSearchResponse);
 

@@ -23,7 +23,7 @@ public class TCPMessageSenderImpl implements TCPMessageSender {
 
         String messageString = message.serialize();
 
-        LOGGER.info("request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
+        LOGGER.info("SHARED: request: \"{}\" sent to: \"{}\"", messageString, destinationNode.getId());
 
         pw.println(messageString);
 
@@ -32,7 +32,7 @@ public class TCPMessageSenderImpl implements TCPMessageSender {
 
         String response = String.valueOf(data, 0, count);
 
-        LOGGER.info("response: \"{}\" received from: \"{}\"", response, destinationNode.getId());
+        LOGGER.info("SHARED: response: \"{}\" received from: \"{}\"", response, destinationNode.getId());
 
         return response;
     }

@@ -35,7 +35,7 @@ public class FileStoreImpl implements FileStore {
         if (!fileIndex.containsKey(id)) {
             fileIndex.put(id, fileInfo);
 
-            LOGGER.info("file: \"{}\" added to file index with fileId: \"{}\"", fileInfo.getName(), id);
+            LOGGER.info("FILES: file: \"{}\" added to file index with fileId: \"{}\"", fileInfo.getName(), id);
         }
     }
 
@@ -44,7 +44,7 @@ public class FileStoreImpl implements FileStore {
         if (fileIndex.containsKey(id)) {
             fileIndex.remove(id);
 
-            LOGGER.info("fileId: \"{}\" removed from file index", id);
+            LOGGER.info("FILES: fileId: \"{}\" removed from file index", id);
         }
     }
 
@@ -53,12 +53,12 @@ public class FileStoreImpl implements FileStore {
         List<FileInfo> files = new ArrayList<>();
         String[] queryTokens = keyword.trim().split(" ");
 
-        LOGGER.trace("query tokens: \"{}\"", Arrays.toString(queryTokens));
+        LOGGER.trace("FILES: query tokens: \"{}\"", Arrays.toString(queryTokens));
 
         for (FileInfo f: fileIndex.values()) {
             String[] fileNameTokens = f.getName().split(" ");
 
-            LOGGER.trace("file name tokens: \"{}\"", Arrays.toString(fileNameTokens));
+            LOGGER.trace("FILES: file name tokens: \"{}\"", Arrays.toString(fileNameTokens));
 
             search:
             for (String s1: queryTokens) {
@@ -66,7 +66,7 @@ public class FileStoreImpl implements FileStore {
                     if (s1.toLowerCase().equals(s2.toLowerCase())) {
                         files.add(f);
 
-                        LOGGER.trace("match found");
+                        LOGGER.trace("FILES: match found");
 
                         break search;
                     }
@@ -74,7 +74,7 @@ public class FileStoreImpl implements FileStore {
             }
         }
 
-        LOGGER.trace("\"{}\" matches found for search query: \"{}\"", files.size(), keyword);
+        LOGGER.trace("FILES: \"{}\" matches found for search query: \"{}\"", files.size(), keyword);
 
         return files;
     }
@@ -96,7 +96,7 @@ public class FileStoreImpl implements FileStore {
 
     @Override
     public void index() {
-        LOGGER.info("file indexing started");
+        LOGGER.info("FILES: file indexing started");
 
         fileIndex.clear();
 
@@ -115,7 +115,7 @@ public class FileStoreImpl implements FileStore {
 
         int bound = fileNames.size();
 
-        LOGGER.info("file list read, \"{}\" file names available", bound);
+        LOGGER.info("FILES: file list read, \"{}\" file names available", bound);
 
         if (fileNames.size() <= min) {
             fileNames.stream().map(FileInfo::new).forEach(f -> add(f.getId(), f));
@@ -134,8 +134,8 @@ public class FileStoreImpl implements FileStore {
             this.add(fileInfo.getId(), fileInfo);
         }
 
-        LOGGER.info("\"{}\" file names added to file index", fileIndex.size());
+        LOGGER.info("FILES: \"{}\" file names added to file index", fileIndex.size());
 
-        LOGGER.info("file indexing completed");
+        LOGGER.info("FILES: file indexing completed");
     }
 }

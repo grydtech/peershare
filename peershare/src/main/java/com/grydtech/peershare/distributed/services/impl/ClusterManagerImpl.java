@@ -78,35 +78,35 @@ public class ClusterManagerImpl implements ClusterManager {
 
         switch (registerResponse.getStatus()) {
             case ERROR:
-                throw new BootstrapException("invalid command, please check again");
+                throw new BootstrapException("DISTRIBUTED: invalid command, please check again");
             case ALREADY_REGISTERED:
-                throw new BootstrapException("already registered");
+                throw new BootstrapException("DISTRIBUTED: already registered");
             case BOOTSTRAP_SERVER_FULL:
-                throw new BootstrapException("bootstrap server full");
+                throw new BootstrapException("DISTRIBUTED: bootstrap server full");
             case UNKNOWN:
-                throw new BootstrapException("unknown error");
+                throw new BootstrapException("DISTRIBUTED: unknown error");
         }
 
-        LOGGER.info("node registered with bootstrap server");
+        LOGGER.info("DISTRIBUTED: node registered with bootstrap server");
         this.clientState = ClientState.IDLE;
 
         this.bootstrapNodes.clear();
 
-        LOGGER.info("bootstrap nodes available: \"{}\"", registerResponse.getNodes().size());
+        LOGGER.info("DISTRIBUTED: bootstrap nodes available: \"{}\"", registerResponse.getNodes().size());
         this.bootstrapNodes.addAll(registerResponse.getNodes());
     }
 
     @Override
     public synchronized void unregister() throws IOException, IllegalCommandException {
         if (this.clientState == ClientState.CONNECTED) {
-            throw new IllegalCommandException("node still connected to cluster, please leave first");
+            throw new IllegalCommandException("DISTRIBUTED: node still connected to cluster, please leave first");
         }
 
         UnregisterResponse unregisterResponse = sendUnregisterRequest();
 
         if (unregisterResponse.getStatus() == BootstrapResponseStatus.SUCCESSFUL) {
             this.clientState = ClientState.UNREGISTERED;
-            LOGGER.info("node unregistered with bootstrap server");
+            LOGGER.info("DISTRIBUTED: node unregistered with bootstrap server");
 
             this.bootstrapNodes.clear();
         }
@@ -115,7 +115,7 @@ public class ClusterManagerImpl implements ClusterManager {
     @Override
     public synchronized void join() throws IllegalCommandException, IOException {
         if (this.clientState == ClientState.UNREGISTERED) {
-            throw new IllegalCommandException("node already unregistered, please register again");
+            throw new IllegalCommandException("DISTRIBUTED: node already unregistered, please register again");
         }
 
         for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
@@ -131,7 +131,7 @@ public class ClusterManagerImpl implements ClusterManager {
         this.knownNodes.clear();
         this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-        LOGGER.info("node disconnected from cluster");
+        LOGGER.info("DISTRIBUTED: node disconnected from cluster");
 
         this.clientState = ClientState.DISCONNECTED;
     }
@@ -145,10 +145,10 @@ public class ClusterManagerImpl implements ClusterManager {
             this.knownNodes.add(connectedNode);
             this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-            LOGGER.info("connected node: \"{}\" added to cluster", connectedNode.getId());
+            LOGGER.info("DISTRIBUTED: connected node: \"{}\" added to cluster", connectedNode.getId());
         } else {
             node.get().resetTTL();
-            LOGGER.trace("node: \"{}\" already connected", connectedNode.getId());
+            LOGGER.trace("DISTRIBUTED: node: \"{}\" already connected", connectedNode.getId());
         }
     }
 
@@ -157,7 +157,7 @@ public class ClusterManagerImpl implements ClusterManager {
         this.knownNodes.removeIf(n -> n.getId().equals(disconnectedNode.getId()));
         this.knownNodesBehaviourSubject.onNext(this.knownNodes);
 
-        LOGGER.info("disconnected node: \"{}\" removed from cluster", disconnectedNode.getId());
+        LOGGER.info("DISTRIBUTED: disconnected node: \"{}\" removed from cluster", disconnectedNode.getId());
     }
 
     @Override
@@ -165,7 +165,7 @@ public class ClusterManagerImpl implements ClusterManager {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(discoveredNode.getId())).findFirst();
 
         if (!node.isPresent()) {
-            LOGGER.info("send join request to: \"{}\"", discoveredNode.getId());
+            LOGGER.info("DISTRIBUTED: send join request to: \"{}\"", discoveredNode.getId());
 
             this.submitJoinRequest(discoveredNode);
         }
@@ -176,11 +176,11 @@ public class ClusterManagerImpl implements ClusterManager {
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(aliveNode.getId())).findFirst();
 
         if (node.isPresent()) {
-            LOGGER.trace("node: \"{}\" ttl reset", aliveNode.getId());
+            LOGGER.trace("DISTRIBUTED: node: \"{}\" ttl reset", aliveNode.getId());
 
             node.get().resetTTL();
         } else {
-            LOGGER.warn("node disconnected, retrying connection");
+            LOGGER.warn("DISTRIBUTED: node disconnected, retrying connection");
 
             this.submitJoinRequest(aliveNode);
         }
@@ -198,7 +198,7 @@ public class ClusterManagerImpl implements ClusterManager {
 
     @Override
     public void startService() {
-        LOGGER.info("distributed manager started");
+        LOGGER.info("DISTRIBUTED: distributed manager started");
 
         startJoinRetry();
         startTTLScanner();
@@ -210,14 +210,14 @@ public class ClusterManagerImpl implements ClusterManager {
     public void stopService() {
         this.scheduledExecutorService.shutdown();
 
-        LOGGER.info("distributed manager stopped");
+        LOGGER.info("DISTRIBUTED: distributed manager stopped");
     }
 
     private void startJoinRetry() {
         this.joinExecutor.scheduleAtFixedRate(() -> {
             synchronized (this) {
                 if (clientState == ClientState.IDLE && !bootstrapNodes.isEmpty() && knownNodes.isEmpty()) {
-                    LOGGER.warn("node is idle, retry join");
+                    LOGGER.warn("DISTRIBUTED: node is idle, retry join");
 
                     for (Node n : NodeHelper.getRandomNodes(this.bootstrapNodes)) {
                         try {
@@ -227,14 +227,14 @@ public class ClusterManagerImpl implements ClusterManager {
                         }
                     }
                 } else {
-                    LOGGER.info("join with cluster completed, shutting down join retry manager");
+                    LOGGER.info("DISTRIBUTED: join with cluster completed, shutting down join retry manager");
 
                     this.joinExecutor.shutdown();
                 }
             }
         }, joinTimeout, joinTimeout, TimeUnit.SECONDS);
 
-        LOGGER.info("join retry manager started");
+        LOGGER.info("DISTRIBUTED: join retry manager started");
     }
 
     private void startTTLScanner() {
@@ -242,11 +242,11 @@ public class ClusterManagerImpl implements ClusterManager {
             synchronized (this) {
                 this.knownNodes.forEach(Node::reduceTTL);
 
-                LOGGER.trace("node ttl cycle completed");
+                LOGGER.trace("DISTRIBUTED: node ttl cycle completed");
             }
         }, 1, 1, TimeUnit.SECONDS);
 
-        LOGGER.info("node ttl reducer started");
+        LOGGER.info("DISTRIBUTED: node ttl reducer started");
 
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             synchronized (this) {
@@ -266,11 +266,11 @@ public class ClusterManagerImpl implements ClusterManager {
                     }
                 });
 
-                LOGGER.trace("node ttl scanned");
+                LOGGER.trace("DISTRIBUTED: node ttl scanned");
             }
         }, nodeTTL, nodeTTL, TimeUnit.SECONDS);
 
-        LOGGER.info("node ttl scanner started");
+        LOGGER.info("DISTRIBUTED: node ttl scanner started");
     }
 
     private void startHeartBeatSender() {
@@ -286,7 +286,7 @@ public class ClusterManagerImpl implements ClusterManager {
             }
         }, 0, nodeHeartBeatInterval, TimeUnit.SECONDS);
 
-        LOGGER.info("node alive gossip sender started");
+        LOGGER.info("DISTRIBUTED: node alive gossip sender started");
     }
 
     private void startGossipSender() {
@@ -305,20 +305,20 @@ public class ClusterManagerImpl implements ClusterManager {
             }
         }, gossipInterval, gossipInterval, TimeUnit.SECONDS);
 
-        LOGGER.info("gossip sender started");
+        LOGGER.info("DISTRIBUTED: gossip sender started");
     }
 
     private RegisterResponse sendRegisterRequest() throws IOException {
         RegisterRequest registerRequest = new RegisterRequest(myNode, username);
 
-        LOGGER.info("send register request");
+        LOGGER.info("DISTRIBUTED: send register request");
 
         String response = tcpMessageSender.sendMessage(registerRequest, bootstrapNode);
 
         RegisterResponse registerResponse = new RegisterResponse();
         registerResponse.deserialize(response);
 
-        LOGGER.info("register response received: \"{}\"", registerResponse.getStatus().toString());
+        LOGGER.info("DISTRIBUTED: register response received: \"{}\"", registerResponse.getStatus().toString());
 
         return registerResponse;
     }
@@ -326,14 +326,14 @@ public class ClusterManagerImpl implements ClusterManager {
     private UnregisterResponse sendUnregisterRequest() throws IOException {
         UnregisterRequest unregisterRequest = new UnregisterRequest(myNode, username);
 
-        LOGGER.info("send unregister request");
+        LOGGER.info("DISTRIBUTED: send unregister request");
 
         String response = tcpMessageSender.sendMessage(unregisterRequest, bootstrapNode);
 
         UnregisterResponse unregisterResponse = new UnregisterResponse();
         unregisterResponse.deserialize(response);
 
-        LOGGER.info("unregister response received: \"{}\"", unregisterResponse.getStatus().toString());
+        LOGGER.info("DISTRIBUTED: unregister response received: \"{}\"", unregisterResponse.getStatus().toString());
 
         return unregisterResponse;
     }
@@ -342,11 +342,11 @@ public class ClusterManagerImpl implements ClusterManager {
         GossipMessage gossipMessage = new GossipMessage(discoveredNode);
 
         if (discoveredNode.getId().equals(destinationNode.getId())) {
-            LOGGER.trace("cannot send node: \"{}\" discovered gossip to same node: \"{}\"", discoveredNode.getId(), destinationNode.getId());
+            LOGGER.trace("DISTRIBUTED: cannot send node: \"{}\" discovered gossip to same node: \"{}\"", discoveredNode.getId(), destinationNode.getId());
             return;
         }
 
-        LOGGER.info("send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
+        LOGGER.info("DISTRIBUTED: send node: \"{}\" discovered gossip to: \"{}\"", discoveredNode.getId(), destinationNode.getId());
 
         udpMessageSender.sendMessage(gossipMessage, destinationNode);
     }
@@ -354,7 +354,7 @@ public class ClusterManagerImpl implements ClusterManager {
     private void sendHeartBeatMessage(Node destinationNode) throws IOException {
         HeartBeatMessage heartBeatMessage = new HeartBeatMessage(myNode);
 
-        LOGGER.info("send heart beat message to: \"{}\"", destinationNode.getId());
+        LOGGER.info("DISTRIBUTED: send heart beat message to: \"{}\"", destinationNode.getId());
         udpMessageSender.sendMessage(heartBeatMessage, destinationNode);
     }
 

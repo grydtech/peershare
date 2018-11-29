@@ -30,7 +30,7 @@ public class UDPMessageListenerImpl implements UDPMessageListener {
     @Override
     public Observable<String> listen() {
         executorService.submit(() -> {
-            LOGGER.info("message acceptor started");
+            LOGGER.info("SHARED: message acceptor started");
 
             while (!udpSocket.isClosed()) {
                 byte[] buf = new byte[256];
@@ -44,7 +44,7 @@ public class UDPMessageListenerImpl implements UDPMessageListener {
 
                 String received = new String(packet.getData(), 0, packet.getLength());
 
-                LOGGER.info("UDP packet received: \"{}\"", received);
+                LOGGER.info("SHARED: UDP packet received: \"{}\"", received);
 
                 messages.onNext(received);
             }

@@ -23,7 +23,7 @@ public class TempFileCreatorImpl implements TempFileCreator {
     public File createTempFile(String fileName) throws IOException {
         Path filePath = Paths.get(tmpdir + File.separator + fileName);
 
-        LOGGER.info("generate temporary file in: \"{}\"", filePath.toAbsolutePath().toString());
+        LOGGER.info("FILES: generate temporary file in: \"{}\"", filePath.toAbsolutePath().toString());
 
         int length = (random.nextInt(10) + 1) * 1024 * 1024;
         byte[] data = new byte[length];
@@ -31,7 +31,7 @@ public class TempFileCreatorImpl implements TempFileCreator {
 
         Files.write(filePath, data);
 
-        LOGGER.info("temporary file generated with random content");
+        LOGGER.info("FILES: temporary file generated with random content");
 
         return new File(filePath.toAbsolutePath().toString());
     }

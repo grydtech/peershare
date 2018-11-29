@@ -56,7 +56,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
     @Override
     public void startService() {
-        LOGGER.info("file search manager started");
+        LOGGER.info("DISTRIBUTED: file search manager started");
 
         scheduledExecutorService.scheduleAtFixedRate(() -> {
             synchronized (this) {
@@ -68,14 +68,14 @@ public class FileSearchManagerImpl implements FileSearchManager {
                     searchMap.remove(key);
                     behaviorSubject.onComplete();
 
-                    LOGGER.trace("search: \"{}\" send completed response and remove", key);
+                    LOGGER.trace("DISTRIBUTED: search: \"{}\" send completed response and remove", key);
                 });
 
                 messages.removeAll(expiredMessages);
             }
         }, searchTimeout, searchTimeout, TimeUnit.SECONDS);
 
-        LOGGER.info("search cleanup started");
+        LOGGER.info("DISTRIBUTED: search cleanup started");
     }
 
     @Override
@@ -89,7 +89,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         this.scheduledExecutorService.shutdown();
 
-        LOGGER.info("file search manager stopped");
+        LOGGER.info("DISTRIBUTED: file search manager stopped");
     }
 
     @Override
@@ -97,10 +97,10 @@ public class FileSearchManagerImpl implements FileSearchManager {
         BehaviorSubject<FileSearchResponse> behaviorSubject = BehaviorSubject.create();
         List<String> fileList = fileStore.search(fileSearchRequest.getKeyword()).stream().map(FileInfo::getName).collect(Collectors.toList());
 
-        LOGGER.info("file search request submitted: \"{}\"", fileSearchRequest.getKeyword());
+        LOGGER.info("DISTRIBUTED: file search request submitted: \"{}\"", fileSearchRequest.getKeyword());
 
         synchronized (this) {
-            LOGGER.trace("add search; \"{}\" to queue for cleanup", fileSearchRequest.getMessageId().toString());
+            LOGGER.trace("DISTRIBUTED: add search; \"{}\" to queue for cleanup", fileSearchRequest.getMessageId().toString());
 
             messages.add(new MessageInfo(fileSearchRequest.getMessageId()));
 
@@ -110,7 +110,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
             searchMap.put(fileSearchRequest.getMessageId().toString(), behaviorSubject);
         }
 
-        LOGGER.info("send file search request to known nodes");
+        LOGGER.info("DISTRIBUTED: send file search request to known nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
             sendFileSearchRequest(fileSearchRequest.getKeyword(), myNode, n, fileSearchRequest.getMessageId(), 1);
@@ -125,7 +125,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
 
         sendFileSearchResponse(fileNames, fileSearchRequest.getNode(), fileSearchRequest.getMessageId(), fileSearchRequest.getHop());
 
-        LOGGER.info("send file search request to random nodes");
+        LOGGER.info("DISTRIBUTED: send file search request to random nodes");
 
         for (Node n : clusterManager.getConnectedCluster()) {
             sendFileSearchRequest(fileSearchRequest.getKeyword(), fileSearchRequest.getNode(), n, fileSearchRequest.getMessageId(), fileSearchRequest.getHop() + 1);
@@ -140,7 +140,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
             if (behaviorSubject != null) {
                 behaviorSubject.onNext(fileSearchResponse);
             } else {
-                LOGGER.warn("search already completed");
+                LOGGER.warn("DISTRIBUTED: search already completed");
             }
         }
     }
@@ -152,11 +152,11 @@ public class FileSearchManagerImpl implements FileSearchManager {
             LOGGER.trace("cannot send search request to same node");
             return;
         } else if (fileSearchRequest.isMaxHopsReached(searchMaxHops + 1)) {
-            LOGGER.trace("search max hop count reached");
+            LOGGER.trace("DISTRIBUTED: search max hop count reached");
             return;
         }
 
-        LOGGER.info("send search request: \"{}\" to: \"{}\"", keyword, destinationNode.getId());
+        LOGGER.info("DISTRIBUTED: send search request: \"{}\" to: \"{}\"", keyword, destinationNode.getId());
 
         udpMessageSender.sendMessage(fileSearchRequest, destinationNode);
     }
@@ -164,7 +164,7 @@ public class FileSearchManagerImpl implements FileSearchManager {
     private void sendFileSearchResponse(List<String> fileList, Node destinationNode, UUID requestId, int hops) throws IOException {
         FileSearchResponse fileSearchResponse = new FileSearchResponse(myNode, fileList, requestId, hops, FileSearchResponseStatus.fromCode(fileList.size()));
 
-        LOGGER.info("send search response: \"{}\" to: \"{}\"", fileList.toString(), destinationNode.getId());
+        LOGGER.info("DISTRIBUTED: send search response: \"{}\" to: \"{}\"", fileList.toString(), destinationNode.getId());
 
         udpMessageSender.sendMessage(fileSearchResponse, destinationNode);
     }
