@@ -52,7 +52,8 @@ public class WebSocketController {
 
         resultObservable.subscribe(fileSearchResponse -> fileSearchResponse.getFileNames().forEach(fn -> {
             FileInfo fileInfo = new FileInfo(fn);
-            SearchResult searchResult = new SearchResult(fileInfo.getId(), fileInfo.getName(), fileSearchResponse.getNode().getHost(), fileSearchResponse.getNode().getPort());
+            SearchResult searchResult = new SearchResult(fileInfo.getId(), fileInfo.getName(), fileSearchResponse.getNode().getHost(),
+                    fileSearchResponse.getNode().getPort(), fileSearchResponse.getHops());
             SearchResponse searchResponse = new SearchResponse(searchRequest.getSearchId(), searchResult);
             simpMessagingTemplate.convertAndSend("/topic/results", searchResponse);
         }));

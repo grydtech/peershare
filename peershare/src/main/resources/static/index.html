@@ -64,6 +64,7 @@
                     <div class="card-body">
                         <h5 class="card-title">Name: {{searchResult.fileName}}</h5>
                         <h6 class="card-subtitle mb-2 text-muted">Url: {{searchResult.fileUrl}}</h6>
+                        <p class="card-text">Hops: {{searchResult.hops}}</p>
                         <button v-on:click="download(searchResult.fileName, searchResult.fileUrl)"
                                 class="btn btn-primary">Download
                         </button>
