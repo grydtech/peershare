@@ -52,6 +52,8 @@ public class ClusterManagerImpl implements ClusterManager {
     private int joinTimeout;
     @Value("${gossip.interval}")
     private int gossipInterval;
+    @Value("${cluster.max}")
+    private int clusterMax;
 
     private final JoinLeaveManager joinLeaveManager;
     private final TCPMessageSender tcpMessageSender;
@@ -160,6 +162,12 @@ public class ClusterManagerImpl implements ClusterManager {
 
     @Override
     public synchronized void nodeDiscovered(Node discoveredNode) throws IOException {
+        if (knownNodes.size() >= clusterMax) {
+            LOGGER.trace("DISTRIBUTED: maximum number of nodes arleady available in the cluster");
+
+            return;
+        }
+
         Optional<Node> node = this.knownNodes.stream().filter(n -> n.getId().equals(discoveredNode.getId())).findFirst();
 
         if (!node.isPresent()) {
