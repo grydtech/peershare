@@ -22,7 +22,7 @@
         <rxjava.version>2.2.3</rxjava.version>
         <commons-codec.version>1.11</commons-codec.version>
         <slf4j.version>1.8.0-beta2</slf4j.version>
-        <jackson.version>2.9.10.1</jackson.version>
+        <jackson.version>2.9.10.7</jackson.version>
     </properties>
 
     <dependencies>
